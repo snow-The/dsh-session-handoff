@@ -28,6 +28,7 @@ window.__ModuleLoader__.load({
     var useState = react.useState;
     var useEffect = react.useEffect;
     var useCallback = react.useCallback;
+    var useRef = react.useRef;
 
     /** Locale namespace id registered under ctx.locale. */
     var NS = "dsh-session-handoff";
@@ -41,7 +42,7 @@ window.__ModuleLoader__.load({
       "nav": "模型路由",
       "section.description": "同模型多供应商（官方 / Ark / 自定义）一键切换 · 会话交接导出 · 上下文压缩阈值",
       "routes.title": "模型路由",
-      "routes.hint": "共享 deepseek-v4-flash 的多条供应商路由。点击「设为默认」切换 agent-default-model（对新会话生效）。",
+      "routes.hint": "共享 deepseek-v4-flash 的多条供应商路由。左右滑动或点下方数字切换，点击「设为默认」生效（新会话）。",
       "routes.loading": "加载中…",
       "routes.empty": "没有可用路由",
       "routes.default": "默认",
@@ -73,16 +74,16 @@ window.__ModuleLoader__.load({
       "acp.saving": "保存中…",
       "acp.saved": "阈值已保存（新会话生效）",
       "acp.failed": "保存失败：{error}",
-      "acp.recommend": "推荐",
+      "acp.recommend": "固定推荐 65/90",
       "acp.recommending": "计算中…",
-      "acp.recommended": "推荐值：软 {min} / 硬 {max}（已填入滑块，点保存生效）",
+      "acp.recommended": "已填入固定推荐：软 {min} / 硬 {max}（点保存生效）",
       "error.load": "加载失败：{error}",
     };
     var EN = {
       "nav": "Model Routes",
       "section.description": "Switch the default model route (official / Ark / custom), export session handoffs, tune compaction thresholds",
       "routes.title": "Model routes",
-      "routes.hint": "Every route serving deepseek-v4-flash. Click “Set default” to point agent-default-model at it (new sessions only).",
+      "routes.hint": "Every route serving deepseek-v4-flash. Swipe or tap the numbers to flip; click “Set default” to point agent-default-model at it (new sessions only).",
       "routes.loading": "Loading…",
       "routes.empty": "No routes available",
       "routes.default": "default",
@@ -114,9 +115,9 @@ window.__ModuleLoader__.load({
       "acp.saving": "Saving…",
       "acp.saved": "Thresholds saved (new sessions)",
       "acp.failed": "Save failed: {error}",
-      "acp.recommend": "Recommend",
+      "acp.recommend": "Fixed 65/90",
       "acp.recommending": "Computing…",
-      "acp.recommended": "Recommended: soft {min} / hard {max} (filled in — click save to apply)",
+      "acp.recommended": "Filled fixed recommendation: soft {min} / hard {max} (click save to apply)",
       "error.load": "Load failed: {error}",
     };
     var dictionaries = { zh: ZH, en: EN };
@@ -145,8 +146,15 @@ window.__ModuleLoader__.load({
       ".dsh-ho__hint{color:var(--dsw-alias-label-tertiary,inherit);font-size:12px;line-height:1.5;margin:0}",
       ".dsh-ho__msg{color:var(--dsw-alias-label-secondary,inherit);font-size:12px;line-height:1.5;margin:0;word-break:break-all}",
       ".dsh-ho__msg--error{color:var(--dsw-alias-label-error,#d93025)}",
-      ".dsh-ho__route{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--dsw-alias-border-l1,transparent)}",
-      ".dsh-ho__route:first-of-type{border-top:0}",
+      ".dsh-ho__carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}",
+      ".dsh-ho__carousel::-webkit-scrollbar{display:none}",
+      ".dsh-ho__slide{flex:0 0 100%;min-width:100%;scroll-snap-align:start;box-sizing:border-box;padding:0 2px 6px}",
+      ".dsh-ho__route{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1,transparent);border-radius:8px;background:var(--dsw-alias-bg-layer-1,transparent)}",
+      ".dsh-ho__nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}",
+      ".dsh-ho__nav-arrow{appearance:none;border:1px solid var(--dsw-alias-border-l2,#d0d3d9);background:var(--dsw-alias-bg-layer-3,transparent);color:var(--dsw-alias-label-primary,inherit);width:24px;height:24px;border-radius:8px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}",
+      ".dsh-ho__nav-arrow:disabled{opacity:.4;cursor:default}",
+      ".dsh-ho__dot{appearance:none;border:0;background:var(--dsw-alias-bg-module-platform,transparent);color:var(--dsw-alias-label-tertiary,inherit);min-width:22px;height:22px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}",
+      ".dsh-ho__dot--active{background:var(--dsw-alias-brand-primary,#4c6fff);color:#fff}",
       ".dsh-ho__route-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}",
       ".dsh-ho__route-name{color:var(--dsw-alias-label-primary,inherit);font-size:13px;font-weight:600;font-family:ui-monospace,Consolas,monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap}",
       ".dsh-ho__badge{font-size:10px;font-weight:500;line-height:1;padding:3px 6px;border-radius:999px;white-space:nowrap}",
@@ -231,6 +239,10 @@ window.__ModuleLoader__.load({
       var visionPair = useState({});
       var vision = visionPair[0];
       var setVision = visionPair[1];
+      var activePair = useState(0);
+      var active = activePair[0];
+      var setActive = activePair[1];
+      var trackRef = useRef(null);
 
       var load = useCallback(async function load() {
         try {
@@ -258,6 +270,13 @@ window.__ModuleLoader__.load({
       }, []);
 
       useEffect(function () { load(); }, [load]);
+
+      // keep the carousel on the first slide whenever the route list reloads
+      useEffect(function () {
+        setActive(0);
+        var el = trackRef.current;
+        if (el) el.scrollLeft = 0;
+      }, [routes]);
 
       function switchTo(route) {
         if (busySwitch !== null) return;
@@ -334,37 +353,19 @@ window.__ModuleLoader__.load({
           .finally(function () { setBusyAcp(false); });
       }
 
-      // Ask the host for cost-optimal thresholds (carrying cost vs one
-      // summarize call per compaction vs quality loss) and fill the sliders.
+      // Fixed recommendation — no per-session computation: deepseek-v4-flash
+      // is a 1M-window model, so soft 65 / hard 90 is the sane default.
       function recommendAcp() {
-        if (busyAcp || !currentSession) return;
-        setBusyAcp(true);
-        setMessage("");
-        apiPost("/recommend", { sessionId: currentSession })
-          .then(function (result) {
-            if (result && result.ok === true) {
-              setDraft({
-                min: percentOf(result.min),
-                max: Math.max(percentOf(result.min) + 1, percentOf(result.max)),
-              });
-              setMessage(t("acp.recommended", { min: result.min, max: result.max }));
-              setMessageError(false);
-            } else {
-              setMessage(t("acp.failed", { error: result && result.error ? result.error : "unknown" }));
-              setMessageError(true);
-            }
-          })
-          .catch(function (error) {
-            setMessage(t("acp.failed", { error: String(error && error.message ? error.message : error) }));
-            setMessageError(true);
-          })
-          .finally(function () { setBusyAcp(false); });
+        if (busyAcp) return;
+        setDraft({ min: 65, max: 90 });
+        setMessage(t("acp.recommended", { min: 65, max: 90 }));
+        setMessageError(false);
       }
 
-      // --- routes list ----------------------------------------------------
-      var routeRows = [];
+      // --- routes carousel (one route per slide: swipe / arrows / dots) ----
+      var routeSlides = [];
       if (routes !== null && routesError === "") {
-        routeRows = routes.map(function (route) {
+        routeSlides = routes.map(function (route) {
           var badges = [];
           if (route.default) {
             badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--default", key: "d" }, t("routes.default")));
@@ -398,18 +399,60 @@ window.__ModuleLoader__.load({
               onClick: function () { switchTo(route); },
             }, busySwitch === route.provider ? t("routes.switching") : (route.default ? t("routes.default") : t("routes.switch"))),
           ];
-          return h("div", { className: "dsh-ho__route", key: route.provider },
-            h("div", { className: "dsh-ho__route-main" },
-              h("div", { className: "dsh-ho__route-name" },
-                route.provider,
-                h("span", { style: { flex: "1 1 auto" } }),
-                badges,
+          return h("div", { className: "dsh-ho__slide", key: route.provider },
+            h("div", { className: "dsh-ho__route" },
+              h("div", { className: "dsh-ho__route-main" },
+                h("div", { className: "dsh-ho__route-name" },
+                  route.provider,
+                  h("span", { style: { flex: "1 1 auto" } }),
+                  badges,
+                ),
+                h("div", { className: "dsh-ho__route-meta" }, metaBits.join(" · ")),
               ),
-              h("div", { className: "dsh-ho__route-meta" }, metaBits.join(" · ")),
+              h("div", { className: "dsh-ho__actions" }, actions),
             ),
-            h("div", { className: "dsh-ho__actions" }, actions),
           );
         });
+      }
+      function scrollToSlide(index) {
+        var el = trackRef.current;
+        if (!el || el.children.length === 0) return;
+        var last = el.children.length - 1;
+        var target = Math.max(0, Math.min(last, index));
+        el.scrollTo({ left: target * el.clientWidth, behavior: "smooth" });
+      }
+      function onTrackScroll() {
+        var el = trackRef.current;
+        if (!el || el.clientWidth === 0) return;
+        var idx = Math.round(el.scrollLeft / el.clientWidth);
+        if (idx !== active) setActive(idx);
+      }
+      var routeNav = [];
+      if (routes !== null && routes.length > 1) {
+        routeNav = [
+          h("div", { className: "dsh-ho__nav", key: "nav" },
+            h("button", {
+              type: "button",
+              className: "dsh-ho__nav-arrow",
+              disabled: active <= 0,
+              onClick: function () { scrollToSlide(active - 1); },
+            }, "‹"),
+            routes.map(function (route, index) {
+              return h("button", {
+                type: "button",
+                key: route.provider,
+                className: "dsh-ho__dot" + (index === active ? " dsh-ho__dot--active" : ""),
+                onClick: function () { scrollToSlide(index); },
+              }, String(index + 1));
+            }),
+            h("button", {
+              type: "button",
+              className: "dsh-ho__nav-arrow",
+              disabled: active >= routes.length - 1,
+              onClick: function () { scrollToSlide(active + 1); },
+            }, "›"),
+          ),
+        ];
       }
 
       // --- acp sliders -----------------------------------------------------
@@ -476,7 +519,8 @@ window.__ModuleLoader__.load({
           ) : null,
           routesError !== "" ? h("p", { className: "dsh-ho__msg dsh-ho__msg--error" }, t("error.load", { error: routesError })) : null,
           routes !== null && routes.length === 0 ? h("p", { className: "dsh-ho__msg" }, t("routes.empty")) : null,
-          routeRows,
+          routes !== null && routes.length > 0 ? h("div", { className: "dsh-ho__carousel", ref: trackRef, onScroll: onTrackScroll, key: "c" }, routeSlides) : null,
+          routeNav,
         ),
         // 2. session handoff
         h("div", { className: "dsh-ho__card" },
@@ -502,7 +546,7 @@ window.__ModuleLoader__.load({
             h("button", {
               type: "button",
               className: "dsh-ho__button",
-              disabled: busyAcp || !currentSession,
+              disabled: busyAcp,
               title: t("acp.hint"),
               onClick: recommendAcp,
             }, busyAcp ? t("acp.recommending") : t("acp.recommend")),

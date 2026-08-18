@@ -78,17 +78,17 @@ web GUI, mirroring the host tools as clickable controls:
 
 - **Model routes panel** — every route serving `deepseek-v4-flash` (official /
   Ark / custom), key family badge, default marker, one-click "Set default"
-  (with an optional vision-variant checkbox). Backed by
+  (with an optional vision-variant checkbox). One route per slide in a
+  swipeable carousel (‹ › arrows + numbered dots). Backed by
   `GET /dsh-session-handoff/routes` + `POST /dsh-session-handoff/switch`.
 - **Session handoff** — export the current session into
   `<workspace>/.dsh-handoff/handoff-<session>.md` with one button
   (`POST /dsh-session-handoff/export`).
 - **Compaction thresholds** — soft/hard limit sliders (17-90%) persisted into
   settings.yaml's `session-handoff:` section (`GET/POST /dsh-session-handoff/acp`).
-  A **"推荐 / Recommend"** button computes cost-optimal limits from the real
-  context window and this session's per-turn growth (carrying cost per turn vs
-  one summarize call per compaction vs quality loss): hard = 90% fuse, soft =
-  hard − 6 turns × growth. Same logic as the `acp_recommend` tool.
+  A **"固定推荐 65/90 / Fixed 65/90"** button fills the sane default for the
+  1M-window model directly (no per-session computation in the GUI; the
+  `acp_recommend` tool still offers the cost-model estimate for agent use).
 
 Host routes share the exact same logic as the tools (enumerateRoutes,
 switchProvider, readAcpSection/writeAcpConfig, exportHandoffForAgent), so the

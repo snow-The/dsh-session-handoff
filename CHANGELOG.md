@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.13.0
+
+- **Fix "method-not-allowed" on saving thresholds**: `/acp` was registered
+  twice (GET + POST) on the same exact path; the webServer keeps a single
+  handler per exact path, so POST fell through to the GET handler. The route
+  is now registered once and dispatches on `req.method` internally.
+- **Fixed recommendation (no more computation)**: the "推荐 / Recommend"
+  button fills soft 65 / hard 90 directly (deepseek-v4-flash is a 1M-window
+  model); the host `/recommend` route and `acp_recommend` tool remain for
+  agent-side use.
+- **Model routes carousel**: the routes list is now one route per slide with
+  swipe (scroll-snap), ‹ › arrows and numbered dots (1 2 3 …) for the
+  small-window "1234" paging the GUI asked for.
+
 ## v0.11.0
 
 - **Cost-optimal ACP threshold recommendation**: `acp_recommend` tool +
