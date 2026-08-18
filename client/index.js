@@ -72,6 +72,9 @@ window.__ModuleLoader__.load({
       "acp.saving": "保存中…",
       "acp.saved": "阈值已保存（新会话生效）",
       "acp.failed": "保存失败：{error}",
+      "acp.recommend": "推荐",
+      "acp.recommending": "计算中…",
+      "acp.recommended": "推荐值：软 {min} / 硬 {max}（已填入滑块，点保存生效）",
       "error.load": "加载失败：{error}",
     };
     var EN = {
@@ -109,6 +112,9 @@ window.__ModuleLoader__.load({
       "acp.saving": "Saving…",
       "acp.saved": "Thresholds saved (new sessions)",
       "acp.failed": "Save failed: {error}",
+      "acp.recommend": "Recommend",
+      "acp.recommending": "Computing…",
+      "acp.recommended": "Recommended: soft {min} / hard {max} (filled in — click save to apply)",
       "error.load": "Load failed: {error}",
     };
     var dictionaries = { zh: ZH, en: EN };
@@ -310,6 +316,33 @@ window.__ModuleLoader__.load({
           .finally(function () { setBusyAcp(false); });
       }
 
+      // Ask the host for cost-optimal thresholds (carrying cost vs one
+      // summarize call per compaction vs quality loss) and fill the sliders.
+      function recommendAcp() {
+        if (busyAcp || !currentSession) return;
+        setBusyAcp(true);
+        setMessage("");
+        apiPost("/recommend", { sessionId: currentSession })
+          .then(function (result) {
+            if (result && result.ok === true) {
+              setDraft({
+                min: percentOf(result.min),
+                max: Math.max(percentOf(result.min) + 1, percentOf(result.max)),
+              });
+              setMessage(t("acp.recommended", { min: result.min, max: result.max }));
+              setMessageError(false);
+            } else {
+              setMessage(t("acp.failed", { error: result && result.error ? result.error : "unknown" }));
+              setMessageError(true);
+            }
+          })
+          .catch(function (error) {
+            setMessage(t("acp.failed", { error: String(error && error.message ? error.message : error) }));
+            setMessageError(true);
+          })
+          .finally(function () { setBusyAcp(false); });
+      }
+
       // --- routes list ----------------------------------------------------
       var routeRows = [];
       if (routes !== null && routesError === "") {
@@ -443,7 +476,14 @@ window.__ModuleLoader__.load({
           h("p", { className: "dsh-ho__title" }, t("acp.title")),
           h("p", { className: "dsh-ho__hint" }, t("acp.hint")),
           sliderRows,
-          h("div", { style: { display: "flex", justifyContent: "flex-end" } },
+          h("div", { style: { display: "flex", justifyContent: "flex-end", gap: "8px" } },
+            h("button", {
+              type: "button",
+              className: "dsh-ho__button",
+              disabled: busyAcp || !currentSession,
+              title: t("acp.hint"),
+              onClick: recommendAcp,
+            }, busyAcp ? t("acp.recommending") : t("acp.recommend")),
             h("button", {
               type: "button",
               className: "dsh-ho__button",

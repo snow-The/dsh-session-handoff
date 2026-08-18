@@ -85,6 +85,10 @@ web GUI, mirroring the host tools as clickable controls:
   (`POST /dsh-session-handoff/export`).
 - **Compaction thresholds** — soft/hard limit sliders (17-90%) persisted into
   settings.yaml's `session-handoff:` section (`GET/POST /dsh-session-handoff/acp`).
+  A **"推荐 / Recommend"** button computes cost-optimal limits from the real
+  context window and this session's per-turn growth (carrying cost per turn vs
+  one summarize call per compaction vs quality loss): hard = 90% fuse, soft =
+  hard − 6 turns × growth. Same logic as the `acp_recommend` tool.
 
 Host routes share the exact same logic as the tools (enumerateRoutes,
 switchProvider, readAcpSection/writeAcpConfig, exportHandoffForAgent), so the

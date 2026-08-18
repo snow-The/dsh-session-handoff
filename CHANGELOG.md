@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.11.0
+
+- **Cost-optimal ACP threshold recommendation**: `acp_recommend` tool +
+  `POST /dsh-session-handoff/recommend` + a "推荐 / Recommend" button next to
+  the threshold sliders. Model: carrying cost per turn vs one summarize call
+  per compaction vs quality loss; hard = 90% fuse (minus a 2×growth burst
+  margin), soft = hard − 6 turns × measured per-turn growth (real session
+  growth from tokenMeter, character-estimate fallback). Unit tests (6).
+
 ## v0.10.0
 
 - **Web client (GUI)**: hand-written `client/index.js` bundle (no build
