@@ -1,0 +1,9 @@
+# dsh-session-handoff — session handoff & context management.
+#
+# Host plugin: registers handoff_* tools (structured session handoff),
+# acp_* tools (active context pruning via the official compaction API),
+# and soft-detects OpenViking / archify for optional memory + diagram
+# enhancement. No client bundle in v0.1 (agent-driven workflow).
+- insert:
+    - id: session-handoff
+      name: 'dsh-session-handoff'
