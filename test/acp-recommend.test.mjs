@@ -47,3 +47,17 @@ test('invalid window tokens throw', () => {
   assert.throws(() => recommendThresholds({ windowTokens: 0 }));
   assert.throws(() => recommendThresholds({ windowTokens: Number.NaN }));
 });
+
+test('pathological growth readings cannot crush the hard limit below ~75%', () => {
+  // A measurement artifact (e.g. a burst of huge tool results inflating the
+  // char-based fallback) must not push the fuse down to 33%.
+  const r = recommendThresholds({ windowTokens: 1048576, growthPerTurn: 350000 });
+  assert.ok(Number(r.max.slice(0, -1)) >= 75, `hard ${r.max} should stay >= 75%`);
+  assert.ok(r.growthPerTurn <= Math.floor(1048576 * 0.2), 'growth must be capped at 20% of the window');
+});
+
+test('burst margin is bounded at 15% of the window', () => {
+  const r = recommendThresholds({ windowTokens: 1048576, growthPerTurn: 200000 });
+  assert.ok(r.windowTokens - r.maxTokens <= Math.floor(1048576 * 0.15));
+  assert.ok(Number(r.max.slice(0, -1)) >= 75);
+});

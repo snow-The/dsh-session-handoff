@@ -66,6 +66,7 @@ window.__ModuleLoader__.load({
       "export.failed": "导出失败：{error}",
       "acp.title": "上下文压缩阈值",
       "acp.hint": "软阈值触发主动压缩提示，硬阈值强制压缩；写入 settings.yaml，对新会话生效。",
+      "acp.current": "当前生效：软 {min} / 硬 {max}",
       "acp.min": "软阈值（压缩前）",
       "acp.max": "硬阈值（立即压缩）",
       "acp.save": "保存阈值",
@@ -106,6 +107,7 @@ window.__ModuleLoader__.load({
       "export.failed": "Export failed: {error}",
       "acp.title": "Compaction thresholds",
       "acp.hint": "The soft limit prompts proactive compression; the hard limit forces it. Written to settings.yaml, effective for new sessions.",
+      "acp.current": "Current: soft {min} / hard {max}",
       "acp.min": "Soft limit (compress before)",
       "acp.max": "Hard limit (compress now)",
       "acp.save": "Save thresholds",
@@ -163,6 +165,9 @@ window.__ModuleLoader__.load({
       ".dsh-ho__slider{flex:2;min-width:0;accent-color:var(--dsw-alias-brand-primary,#4c6fff)}",
       ".dsh-ho__slider-value{flex:none;width:48px;text-align:right;color:var(--dsw-alias-label-primary,inherit);font-size:12px;font-family:ui-monospace,Consolas,monospace}",
       ".dsh-ho__checkbox{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary,inherit);font-size:12px;white-space:nowrap}",
+      ".dsh-ho__skeleton{display:flex;flex-direction:column;gap:8px;padding:6px 0}",
+      ".dsh-ho__skeleton-bar{height:12px;border-radius:6px;background:var(--dsw-alias-bg-module-platform,transparent);opacity:.5;animation:dsh-ho-pulse 1.2s ease-in-out infinite}",
+      "@keyframes dsh-ho-pulse{0%,100%{opacity:.35}50%{opacity:.7}}",
     ].join("");
 
     // ---------------------------------------------------------------------
@@ -465,7 +470,10 @@ window.__ModuleLoader__.load({
         h("div", { className: "dsh-ho__card" },
           h("p", { className: "dsh-ho__title" }, t("routes.title")),
           h("p", { className: "dsh-ho__hint" }, t("routes.hint")),
-          routes === null && routesError === "" ? h("p", { className: "dsh-ho__msg" }, t("routes.loading")) : null,
+          routes === null && routesError === "" ? h("div", { className: "dsh-ho__skeleton", key: "sk" },
+            h("div", { className: "dsh-ho__skeleton-bar", style: { width: "85%" } }),
+            h("div", { className: "dsh-ho__skeleton-bar", style: { width: "60%" } }),
+          ) : null,
           routesError !== "" ? h("p", { className: "dsh-ho__msg dsh-ho__msg--error" }, t("error.load", { error: routesError })) : null,
           routes !== null && routes.length === 0 ? h("p", { className: "dsh-ho__msg" }, t("routes.empty")) : null,
           routeRows,
@@ -488,6 +496,7 @@ window.__ModuleLoader__.load({
         h("div", { className: "dsh-ho__card" },
           h("p", { className: "dsh-ho__title" }, t("acp.title")),
           h("p", { className: "dsh-ho__hint" }, t("acp.hint")),
+          acp !== null ? h("p", { className: "dsh-ho__msg" }, t("acp.current", { min: acp.minContextLimit, max: acp.maxContextLimit })) : null,
           sliderRows,
           h("div", { style: { display: "flex", justifyContent: "flex-end", gap: "8px" } },
             h("button", {
