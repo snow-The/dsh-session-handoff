@@ -8,22 +8,25 @@ the latest DSH update and don't cover the full workflow.
 
 Long sessions (like a 170k-line r32 session) hit context limits, trigger
 repeated automatic compaction, and stall. Switching to a fresh session loses
-all progress. This plugin fixes both halves:
+all progress. This plugin fixes both halves — and more:
 
 1. **Handoff** — export a structured, portable handoff document so a fresh
    session can continue seamlessly.
 2. **Active context pruning** — compress spent history before the context
-   window fills, using the official compaction API with model-authored
-   summaries (absorbed & refreshed from `dsh-active-context-pruning`).
+   window fills (official compaction API, model-authored summaries).
+3. **Session management** — trash / restore / purge / list sessions.
+4. **Model routes** — share one model id (e.g. deepseek-v4-flash) across
+   several vendors/plans (official API, Ark, …) and switch between them.
+5. **ACP thresholds** — tune compaction limits without touching YAML.
 
-## Features
+## Tools
 
 ### Module A — Handoff (zero dependencies)
 
 | Tool | Purpose |
 |---|---|
 | `handoff_status` | Compact session overview: turns, messages, tool usage, checkpoints, context pressure |
-| `handoff_export` | Parse the current session into a structured Markdown handoff under `<workspace>/.dsh-handoff/` |
+| `handoff_export` | Parse the session into a structured Markdown handoff under `<workspace>/.dsh-handoff/` + a ready-to-run **handoff package** (OpenViking archive command, archify diagram command — only when those enhancers are present) |
 | `handoff_resume` | Load the latest handoff document in a fresh session and continue |
 
 Also `/handoff` command.
@@ -36,17 +39,43 @@ Also `/handoff` command.
 | `acp_compress` | Replace an inclusive surface seq range with your summary (`ctx.compaction.compactRegion`) |
 | `acp_decompress` | Read the original text hidden by a checkpoint (read-only) |
 | `acp_search` | Search visible + hidden compacted history |
+| `acp_config` | Show the active thresholds (soft/hard limits, preserveRecent, minTokens, nudge) |
+| `acp_set_limit` | Persist new thresholds into settings.yaml (new sessions take them) |
 
 Plus a system-prompt pressure banner that nudges the model to compress past
-the soft/hard limit (`60%` / `70%` defaults, configurable), and a
-`compaction.summarize` interception so model-authored summaries are used.
+the soft/hard limit (`60%` / `70%` defaults), and a `compaction.summarize`
+interception so model-authored summaries are used.
 
-### Module C — Soft enhancers (detected, never required)
+### Module C — Session management
 
-- **OpenViking memory**: if `viking_*` tools are present, `handoff_export`
-  reports it and suggests `viking_remember` for cross-session recall.
-- **archify**: if the archify skill/CLI is present, `handoff_status` reports
-  it so the agent can generate a progress diagram.
+| Tool | Purpose |
+|---|---|
+| `session_list` | List sessions (optionally including the trash) |
+| `session_trash` | Archive + move a session's artifact into the plugin trash (recoverable; refuses running sessions) |
+| `session_restore` | Move it back and unarchive |
+| `session_purge` | Permanently delete artifact + trash entry |
+
+Trash entries persist as JSON under `$DSH_HOME/dsh-session-handoff-trash/`
+(keeps the newest 10; oldest overflow auto-purged).
+
+### Module D — Model routes (same model, many vendors)
+
+| Tool | Purpose |
+|---|---|
+| `model_routes` | List every route serving `deepseek-v4-flash`: provider, baseURL, key env + family (ark-/sk-), default marker (incl. vision-toolkit- variants), vision wrapper variant |
+| `model_switch` | Point agent-default-model at a route (persisted to settings.yaml; new sessions use it). Optional `vision:true` selects the vision wrapper variant; warns when the key family is missing |
+
+Built for users sharing one model id across official DeepSeek and Volcano
+Ark plans: `model_routes` shows what is configured, `model_switch deepseek`
+uses the Ark lane, `model_switch deepseek-official --vision` uses the official
+lane with the vision wrapper.
+
+### Soft enhancers (detected, never required)
+
+- **OpenViking**: when `viking_*` tools are present, `handoff_export` embeds
+  a ready `viking_remember` command in the handoff package.
+- **archify**: when `@tt-a1i/archify-dsh` is installed, the handoff package
+  includes an `archify render` command for a progress diagram.
 
 Core works with neither installed.
 
@@ -62,7 +91,7 @@ dsh plugin --profile web add github:snow-The/dsh-session-handoff
 In the old session:
 
 ```
-handoff_export   → writes .dsh-handoff/handoff-<session>.md
+handoff_export   → writes .dsh-handoff/handoff-<session>.md (+ handoff package)
 ```
 
 In the new session:
@@ -76,13 +105,24 @@ Before heavy work in long sessions:
 ```
 acp_status       → check pressure
 acp_compress {start} {end} {summary}   → prune spent ranges
+acp_set_limit    → tune soft/hard limits proactively
 ```
 
-## How the defaults work
+Switching vendors for the shared model:
 
-dsh-settings registers each entry's patch config as the `base` of its
-settings section, so user settings.yaml always wins. Compaction thresholds
-are read from the plugin config (`minContextLimit` / `maxContextLimit`).
+```
+model_routes                       → see the routes
+model_switch deepseek              → use the Ark lane
+model_switch deepseek-official     → use the official lane
+model_switch deepseek --vision     → ...with the vision wrapper
+```
+
+## Development
+
+```bash
+# unit tests (run from a profile dir so @deepseek-ai/* resolves)
+node --test test/
+```
 
 ## License
 
