@@ -42,7 +42,7 @@ window.__ModuleLoader__.load({
       "nav": "模型路由",
       "section.description": "同模型多供应商（官方 / Ark / 自定义）一键切换 · 会话交接导出 · 上下文压缩阈值",
       "routes.title": "模型路由",
-      "routes.hint": "共享 deepseek-v4-flash 的多条供应商路由。左右滑动或点下方数字切换，点击「设为默认」生效（新会话）。",
+      "routes.hint": "按优先级排列的模型路由：拖拽排序、可删除/添加。当当前模型无法呼叫或额度耗尽时，自动切换列表中的下一个并继续工作（用户中断不会切换）。",
       "routes.loading": "加载中…",
       "routes.empty": "没有可用路由",
       "routes.default": "默认",
@@ -57,6 +57,15 @@ window.__ModuleLoader__.load({
       "routes.builtin": "内置路由",
       "routes.configured": "已配置路由",
       "routes.keyMissing": "未找到密钥",
+      "failover.title": "自动切换（故障转移）",
+      "failover.off": "未启用——加入至少一个路由后，模型不可用/额度耗尽时会自动切换。",
+      "failover.add": "添加",
+      "failover.remove": "移除",
+      "failover.save": "保存优先级",
+      "failover.saving": "保存中…",
+      "failover.saved": "优先级已保存，新请求生效",
+      "failover.saveFailed": "保存失败：{error}",
+      "failover.empty": "所有可用路由都已加入列表",
       "export.title": "会话交接",
       "export.hint": "把当前会话导出为结构化交接文档（.dsh-handoff/），新会话可直接续接。",
       "export.current": "当前会话：{session}",
@@ -83,7 +92,7 @@ window.__ModuleLoader__.load({
       "nav": "Model Routes",
       "section.description": "Switch the default model route (official / Ark / custom), export session handoffs, tune compaction thresholds",
       "routes.title": "Model routes",
-      "routes.hint": "Every route serving deepseek-v4-flash. Swipe or tap the numbers to flip; click “Set default” to point agent-default-model at it (new sessions only).",
+      "routes.hint": "Priority-ordered model routes: drag to reorder, delete / add entries. When the active model is unreachable or out of quota, the next entry is tried automatically and work continues (user interruptions never switch).",
       "routes.loading": "Loading…",
       "routes.empty": "No routes available",
       "routes.default": "default",
@@ -98,6 +107,15 @@ window.__ModuleLoader__.load({
       "routes.builtin": "built-in route",
       "routes.configured": "configured route",
       "routes.keyMissing": "no key found",
+      "failover.title": "Auto failover",
+      "failover.off": "Disabled — add at least one route and unreachable / out-of-quota models switch automatically.",
+      "failover.add": "Add",
+      "failover.remove": "Remove",
+      "failover.save": "Save priority",
+      "failover.saving": "Saving…",
+      "failover.saved": "Priority saved, active for new requests",
+      "failover.saveFailed": "Save failed: {error}",
+      "failover.empty": "Every available route is already in the list",
       "export.title": "Session handoff",
       "export.hint": "Export the current session into a structured handoff document (.dsh-handoff/) a fresh session can resume from.",
       "export.current": "Current session: {session}",
@@ -146,12 +164,16 @@ window.__ModuleLoader__.load({
       ".dsh-ho__hint{color:var(--dsw-alias-label-tertiary,inherit);font-size:12px;line-height:1.5;margin:0}",
       ".dsh-ho__msg{color:var(--dsw-alias-label-secondary,inherit);font-size:12px;line-height:1.5;margin:0;word-break:break-all}",
       ".dsh-ho__msg--error{color:var(--dsw-alias-label-error,#d93025)}",
-      ".dsh-ho__carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}",
-      ".dsh-ho__carousel::-webkit-scrollbar{display:none}",
-      ".dsh-ho__slide{flex:0 0 100%;min-width:100%;scroll-snap-align:start;box-sizing:border-box;padding:0 2px 6px}",
       ".dsh-ho__route{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1,transparent);border-radius:8px;background:var(--dsw-alias-bg-layer-1,transparent)}",
       ".dsh-ho__nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}",
-      ".dsh-ho__nav-arrow{appearance:none;border:1px solid var(--dsw-alias-border-l2,#d0d3d9);background:var(--dsw-alias-bg-layer-3,transparent);color:var(--dsw-alias-label-primary,inherit);width:24px;height:24px;border-radius:8px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}",
+      ".dsh-ho__fo-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1,transparent);border-radius:8px;background:var(--dsw-alias-bg-layer-1,transparent);cursor:grab;margin-bottom:6px}",
+      ".dsh-ho__fo-row--drag{opacity:.45}",
+      ".dsh-ho__fo-idx{flex:none;width:20px;text-align:center;color:var(--dsw-alias-label-tertiary,inherit);font-size:12px;font-family:ui-monospace,Consolas,monospace}",
+      ".dsh-ho__fo-handle{flex:none;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:grab;user-select:none;line-height:1}",
+      ".dsh-ho__fo-remove{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;flex:none}",
+      ".dsh-ho__fo-remove:hover{color:var(--dsw-alias-label-error,#d93025);background:var(--dsw-alias-bg-module-platform,transparent)}",
+      ".dsh-ho__fo-add{display:flex;align-items:center;gap:8px;margin-top:6px}",
+      ".dsh-ho__fo-select{flex:1;min-width:0;font-size:12px;color:var(--dsw-alias-label-primary,inherit);background:var(--dsw-alias-bg-layer-2,transparent);border:1px solid var(--dsw-alias-border-l2,#d0d3d9);border-radius:8px;padding:5px 8px}",
       ".dsh-ho__nav-arrow:disabled{opacity:.4;cursor:default}",
       ".dsh-ho__dot{appearance:none;border:0;background:var(--dsw-alias-bg-module-platform,transparent);color:var(--dsw-alias-label-tertiary,inherit);min-width:22px;height:22px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}",
       ".dsh-ho__dot--active{background:var(--dsw-alias-brand-primary,#4c6fff);color:#fff}",
@@ -243,10 +265,25 @@ window.__ModuleLoader__.load({
       var active = activePair[0];
       var setActive = activePair[1];
       var trackRef = useRef(null);
+      var failoverPair = useState([]);
+      var failoverList = failoverPair[0];
+      var setFailoverList = failoverPair[1];
+      var failoverLoadedPair = useState(false);
+      var failoverLoaded = failoverLoadedPair[0];
+      var setFailoverLoaded = failoverLoadedPair[1];
+      var addValuePair = useState("");
+      var addValue = addValuePair[0];
+      var setAddValue = addValuePair[1];
+      var dragIndexPair = useState(null);
+      var dragIndex = dragIndexPair[0];
+      var setDragIndex = dragIndexPair[1];
+      var busyFailoverPair = useState(false);
+      var busyFailover = busyFailoverPair[0];
+      var setBusyFailover = busyFailoverPair[1];
 
       var load = useCallback(async function load() {
         try {
-          var results = await Promise.all([apiGet("/routes"), apiGet("/acp")]);
+          var results = await Promise.all([apiGet("/routes"), apiGet("/acp"), apiGet("/failover")]);
           var r = results[0];
           var a = results[1];
           if (r && r.ok === true && Array.isArray(r.routes)) {
@@ -263,6 +300,11 @@ window.__ModuleLoader__.load({
               min: percentOf(a.section.minContextLimit),
               max: Math.max(percentOf(a.section.minContextLimit), percentOf(a.section.maxContextLimit)),
             });
+          }
+          var f = results[2];
+          if (f && f.ok === true && Array.isArray(f.routes)) {
+            setFailoverList(f.routes);
+            setFailoverLoaded(true);
           }
         } catch (error) {
           setRoutesError(String(error && error.message ? error.message : error));
@@ -362,97 +404,137 @@ window.__ModuleLoader__.load({
         setMessageError(false);
       }
 
-      // --- routes carousel (one route per slide: swipe / arrows / dots) ----
-      var routeSlides = [];
-      if (routes !== null && routesError === "") {
-        routeSlides = routes.map(function (route) {
+      // --- failover priority list (drag to reorder, delete / add) ----
+      var failoverRows = [];
+      if (failoverLoaded && routes !== null) {
+        var routeById = {};
+        routes.forEach(function (route) { routeById[route.provider] = route; });
+        failoverRows = failoverList.map(function (provider, index) {
+          var route = routeById[provider] || null;
           var badges = [];
-          if (route.default) {
-            badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--default", key: "d" }, t("routes.default")));
+          if (route !== null) {
+            if (route.default) {
+              badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--default", key: "d" }, t("routes.default")));
+            }
+            if (route.keyFamily === "(missing)" || route.keyFamily === "unknown") {
+              badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--warn", key: "k" }, t("routes.keyMissing")));
+            } else {
+              badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--builtin", key: "k" }, (route.keyEnv || "?") + " [" + (route.keyFamily || "?") + "]"));
+            }
           }
-          if (route.keyFamily === "(missing)" || route.keyFamily === "unknown") {
-            badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--warn", key: "k" }, t("routes.keyMissing")));
-          } else {
-            badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--builtin", key: "k" }, route.keyEnv + " [" + route.keyFamily + "]"));
-          }
-          var metaBits = [route.baseURL || "?", route.note || ""];
-          if (route.servesModel) metaBits.push(t("routes.serves"));
-          var actions = [
-            h("label", { className: "dsh-ho__checkbox", key: "v", title: t("routes.vision") },
+          var actions = [];
+          if (route !== null) {
+            actions.push(h("label", { className: "dsh-ho__checkbox", key: "v", title: t("routes.vision") },
               h("input", {
                 type: "checkbox",
-                checked: vision[route.provider] === true,
+                checked: vision[provider] === true,
                 disabled: busySwitch !== null,
                 onChange: function (event) {
                   var next = Object.assign({}, vision);
-                  next[route.provider] = event.target.checked;
+                  next[provider] = event.target.checked;
                   setVision(next);
                 },
               }),
               t("routes.vision"),
+            ));
+            if (!route.default) {
+              actions.push(h("button", {
+                type: "button",
+                key: "s",
+                className: "dsh-ho__button",
+                disabled: busySwitch !== null,
+                onClick: function () { switchTo(route); },
+              }, busySwitch === provider ? t("routes.switching") : t("routes.switch")));
+            }
+          }
+          actions.push(h("button", {
+            type: "button",
+            key: "x",
+            className: "dsh-ho__fo-remove",
+            title: t("failover.remove"),
+            onClick: function () {
+              setFailoverList(failoverList.filter(function (p) { return p !== provider; }));
+            },
+          }, "✕"));
+          return h("div", {
+            className: "dsh-ho__fo-row" + (dragIndex === index ? " dsh-ho__fo-row--drag" : ""),
+            key: provider,
+            draggable: true,
+            onDragStart: function () { setDragIndex(index); },
+            onDragOver: function (event) { event.preventDefault(); },
+            onDrop: function () {
+              var from = dragIndex;
+              setDragIndex(null);
+              if (from === null || from === index) return;
+              var next = failoverList.slice();
+              var item = next.splice(from, 1)[0];
+              next.splice(index, 0, item);
+              setFailoverList(next);
+            },
+            onDragEnd: function () { setDragIndex(null); },
+          },
+            h("span", { className: "dsh-ho__fo-handle" }, "⠿"),
+            h("span", { className: "dsh-ho__fo-idx" }, String(index + 1) + "."),
+            h("div", { className: "dsh-ho__route-main" },
+              h("div", { className: "dsh-ho__route-name" }, provider, h("span", { style: { flex: "1 1 auto" } }), badges),
             ),
-            h("button", {
-              type: "button",
-              key: "s",
-              className: "dsh-ho__button dsh-ho__button--primary",
-              disabled: busySwitch !== null || route.default,
-              onClick: function () { switchTo(route); },
-            }, busySwitch === route.provider ? t("routes.switching") : (route.default ? t("routes.default") : t("routes.switch"))),
-          ];
-          return h("div", { className: "dsh-ho__slide", key: route.provider },
-            h("div", { className: "dsh-ho__route" },
-              h("div", { className: "dsh-ho__route-main" },
-                h("div", { className: "dsh-ho__route-name" },
-                  route.provider,
-                  h("span", { style: { flex: "1 1 auto" } }),
-                  badges,
-                ),
-                h("div", { className: "dsh-ho__route-meta" }, metaBits.join(" · ")),
-              ),
-              h("div", { className: "dsh-ho__actions" }, actions),
-            ),
+            h("div", { className: "dsh-ho__actions" }, actions),
           );
         });
       }
-      function scrollToSlide(index) {
-        var el = trackRef.current;
-        if (!el || el.children.length === 0) return;
-        var last = el.children.length - 1;
-        var target = Math.max(0, Math.min(last, index));
-        el.scrollTo({ left: target * el.clientWidth, behavior: "smooth" });
+      var addOptions = [];
+      if (routes !== null) {
+        addOptions = routes
+          .filter(function (route) { return failoverList.indexOf(route.provider) === -1; })
+          .map(function (route) {
+            return h("option", { key: route.provider, value: route.provider }, route.provider);
+          });
       }
-      function onTrackScroll() {
-        var el = trackRef.current;
-        if (!el || el.clientWidth === 0) return;
-        var idx = Math.round(el.scrollLeft / el.clientWidth);
-        if (idx !== active) setActive(idx);
-      }
-      var routeNav = [];
-      if (routes !== null && routes.length > 1) {
-        routeNav = [
-          h("div", { className: "dsh-ho__nav", key: "nav" },
+      var addRow = [];
+      if (routes !== null && routes.length > 0) {
+        addRow = [
+          h("div", { className: "dsh-ho__fo-add", key: "add" },
+            h("select", {
+              className: "dsh-ho__fo-select",
+              value: addValue,
+              disabled: addOptions.length === 0,
+              onChange: function (event) { setAddValue(event.target.value); },
+            },
+              addOptions.length === 0 ? h("option", { value: "" }, t("failover.empty")) : addOptions,
+            ),
             h("button", {
               type: "button",
-              className: "dsh-ho__nav-arrow",
-              disabled: active <= 0,
-              onClick: function () { scrollToSlide(active - 1); },
-            }, "‹"),
-            routes.map(function (route, index) {
-              return h("button", {
-                type: "button",
-                key: route.provider,
-                className: "dsh-ho__dot" + (index === active ? " dsh-ho__dot--active" : ""),
-                onClick: function () { scrollToSlide(index); },
-              }, String(index + 1));
-            }),
-            h("button", {
-              type: "button",
-              className: "dsh-ho__nav-arrow",
-              disabled: active >= routes.length - 1,
-              onClick: function () { scrollToSlide(active + 1); },
-            }, "›"),
+              className: "dsh-ho__button",
+              disabled: addValue === "" || addOptions.length === 0,
+              onClick: function () {
+                if (addValue === "") return;
+                setFailoverList(failoverList.concat([addValue]));
+                setAddValue("");
+              },
+            }, t("failover.add")),
           ),
         ];
+      }
+      function saveFailover() {
+        if (busyFailover) return;
+        setBusyFailover(true);
+        setMessage("");
+        apiPost("/failover", { providers: failoverList })
+          .then(function (result) {
+            if (result && result.ok === true) {
+              setFailoverList(result.routes);
+              setMessage(t("failover.saved"));
+              setMessageError(false);
+            } else {
+              setMessage(t("failover.saveFailed", { error: result && result.error ? result.error : "unknown" }));
+              setMessageError(true);
+            }
+          })
+          .catch(function (error) {
+            setMessage(t("failover.saveFailed", { error: String(error && error.message ? error.message : error) }));
+            setMessageError(true);
+          })
+          .finally(function () { setBusyFailover(false); });
       }
 
       // --- acp sliders -----------------------------------------------------
@@ -519,8 +601,17 @@ window.__ModuleLoader__.load({
           ) : null,
           routesError !== "" ? h("p", { className: "dsh-ho__msg dsh-ho__msg--error" }, t("error.load", { error: routesError })) : null,
           routes !== null && routes.length === 0 ? h("p", { className: "dsh-ho__msg" }, t("routes.empty")) : null,
-          routes !== null && routes.length > 0 ? h("div", { className: "dsh-ho__carousel", ref: trackRef, onScroll: onTrackScroll, key: "c" }, routeSlides) : null,
-          routeNav,
+          failoverLoaded && failoverList.length === 0 ? h("p", { className: "dsh-ho__msg", key: "off" }, t("failover.off")) : null,
+          failoverRows,
+          addRow,
+          failoverLoaded ? h("div", { style: { display: "flex", justifyContent: "flex-end", gap: "8px" }, key: "save" },
+            h("button", {
+              type: "button",
+              className: "dsh-ho__button dsh-ho__button--primary",
+              disabled: busyFailover || failoverList.length === 0,
+              onClick: saveFailover,
+            }, busyFailover ? t("failover.saving") : t("failover.save")),
+          ) : null,
         ),
         // 2. session handoff
         h("div", { className: "dsh-ho__card" },

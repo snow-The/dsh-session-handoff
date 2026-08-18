@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.14.0
+
+- **Provider failover (auto route switching)** — the core ask: a priority
+  list of routes in settings.yaml (`session-handoff.failoverRoutes: a,b,c`,
+  order = priority). When a model request fails because the active provider
+  is unreachable or out of quota (`QUOTA` / `RATE_LIMIT` / `SERVER` /
+  `TIMEOUT` / `TRANSPORT` / `EMPTY_RESPONSE` / `AUTH` / credential / adapter
+  errors), the next route is tried automatically and the step continues.
+  User interruptions (aborted signals) NEVER fail over. Wired through the
+  official extension points: `agent/request-error` (return `{kind:"retry"}`)
+  + `agent/request` (override the provider in the seed call config, so
+  `prepareCall` rebinds the adapter). Every switch is recorded as an
+  `llm/failover` session event.
+- **Priority list UI** (replaces the v0.13 carousel): vertical list with
+  drag-to-reorder rows, delete (✕) per row, add-from-pool select, and a
+  "save priority" button (`GET|POST /dsh-session-handoff/failover`). The
+  "set default" (agent-default-model) button stays per row.
+- `failover_config` / `failover_set` tools for the agent. Unit tests (7).
+
 ## v0.13.0
 
 - **Fix "method-not-allowed" on saving thresholds**: `/acp` was registered

@@ -78,9 +78,14 @@ web GUI, mirroring the host tools as clickable controls:
 
 - **Model routes panel** — every route serving `deepseek-v4-flash` (official /
   Ark / custom), key family badge, default marker, one-click "Set default"
-  (with an optional vision-variant checkbox). One route per slide in a
-  swipeable carousel (‹ › arrows + numbered dots). Backed by
-  `GET /dsh-session-handoff/routes` + `POST /dsh-session-handoff/switch`.
+  (with an optional vision-variant checkbox).
+- **Auto failover (priority list)** — drag-to-reorder the routes, delete or
+  add entries, save the priority. When the active model is unreachable or
+  out of quota (`QUOTA` / `RATE_LIMIT` / `SERVER` / `TIMEOUT` / `TRANSPORT` /
+  `EMPTY_RESPONSE` / `AUTH` / credential / adapter errors), the next route is
+  tried automatically and work continues — user interruptions never switch.
+  Backed by `GET|POST /dsh-session-handoff/failover` and the
+  `agent/request-error` + `agent/request` waterfalls.
 - **Session handoff** — export the current session into
   `<workspace>/.dsh-handoff/handoff-<session>.md` with one button
   (`POST /dsh-session-handoff/export`).
