@@ -193,26 +193,39 @@ window.__ModuleLoader__.load({
       var sessions = props.sessions;
       var currentSession = sessions && sessions.list ? sessions.list.getSnapshot().current : undefined;
 
-      var routes = useState(null)[0];
-      var setRoutes = useState(null)[1];
-      var routesError = useState("")[0];
-      var setRoutesError = useState("")[1];
-      var acp = useState(null)[0];
-      var setAcp = useState(null)[1];
-      var draft = useState(null)[0];
-      var setDraft = useState(null)[1];
-      var busySwitch = useState(null)[0];
-      var setBusySwitch = useState(null)[1];
-      var busyExport = useState(false)[0];
-      var setBusyExport = useState(false)[1];
-      var busyAcp = useState(false)[0];
-      var setBusyAcp = useState(false)[1];
-      var message = useState("")[0];
-      var setMessage = useState("")[1];
-      var messageError = useState(false)[0];
-      var setMessageError = useState(false)[1];
-      var vision = useState({})[0];
-      var setVision = useState({})[1];
+      // NOTE: each pair must come from ONE useState call — `useState(x)[0]`
+      // followed by a separate `useState(x)[1]` would bind the setter to a
+      // different hook than the reader, so state updates would never render.
+      var routesPair = useState(null);
+      var routes = routesPair[0];
+      var setRoutes = routesPair[1];
+      var routesErrorPair = useState("");
+      var routesError = routesErrorPair[0];
+      var setRoutesError = routesErrorPair[1];
+      var acpPair = useState(null);
+      var acp = acpPair[0];
+      var setAcp = acpPair[1];
+      var draftPair = useState(null);
+      var draft = draftPair[0];
+      var setDraft = draftPair[1];
+      var busySwitchPair = useState(null);
+      var busySwitch = busySwitchPair[0];
+      var setBusySwitch = busySwitchPair[1];
+      var busyExportPair = useState(false);
+      var busyExport = busyExportPair[0];
+      var setBusyExport = busyExportPair[1];
+      var busyAcpPair = useState(false);
+      var busyAcp = busyAcpPair[0];
+      var setBusyAcp = busyAcpPair[1];
+      var messagePair = useState("");
+      var message = messagePair[0];
+      var setMessage = messagePair[1];
+      var messageErrorPair = useState(false);
+      var messageError = messageErrorPair[0];
+      var setMessageError = messageErrorPair[1];
+      var visionPair = useState({});
+      var vision = visionPair[0];
+      var setVision = visionPair[1];
 
       var load = useCallback(async function load() {
         try {
