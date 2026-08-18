@@ -1,19 +1,34 @@
 {
   "name": "dsh-session-handoff",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "main": "./lib/index.js",
   "description": "Session handoff & context management for DeepSeek Harness: structured handoff documents (export/resume/status), active context pruning (acp_* tools + pressure banner), session management (trash/restore/purge), model routes for one model across vendors/plans, and optional OpenViking memory / archify diagram integration. Core is zero-dependency (official compaction API + node builtins); memory/diagram enhance when detected.",
   "files": [
     "lib",
+    "client",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/index.js",
+    "./package.json": "./package.json"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
     }
   },
   "keywords": [

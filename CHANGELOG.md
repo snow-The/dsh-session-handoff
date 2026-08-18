@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.10.0
+
+- **Web client (GUI)**: hand-written `client/index.js` bundle (no build
+  step) registering a Settings section "模型路由 / Model Routes":
+  model routes panel with one-click default switch (+ vision variant),
+  session handoff export button, ACP threshold sliders (17-90%).
+- Host HTTP routes (`/dsh-session-handoff/{routes,switch,acp,export}`)
+  sharing the exact tool logic (enumerateRoutes/switchProvider/
+  readAcpSection/writeAcpConfig/exportHandoffForAgent).
+- `dsh.client` + `exports["./client"]` in package.json.
+
 ## v0.8.0 (unreleased)
 
 - README rewritten to cover all four modules (handoff, ACP, session

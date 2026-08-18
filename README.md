@@ -70,6 +70,26 @@ Ark plans: `model_routes` shows what is configured, `model_switch deepseek`
 uses the Ark lane, `model_switch deepseek-official --vision` uses the official
 lane with the vision wrapper.
 
+### Module E — Web client (GUI)
+
+The plugin ships a hand-written client bundle (`client/index.js`, no build
+step) that registers a **Settings section "模型路由 / Model Routes"** in the
+web GUI, mirroring the host tools as clickable controls:
+
+- **Model routes panel** — every route serving `deepseek-v4-flash` (official /
+  Ark / custom), key family badge, default marker, one-click "Set default"
+  (with an optional vision-variant checkbox). Backed by
+  `GET /dsh-session-handoff/routes` + `POST /dsh-session-handoff/switch`.
+- **Session handoff** — export the current session into
+  `<workspace>/.dsh-handoff/handoff-<session>.md` with one button
+  (`POST /dsh-session-handoff/export`).
+- **Compaction thresholds** — soft/hard limit sliders (17-90%) persisted into
+  settings.yaml's `session-handoff:` section (`GET/POST /dsh-session-handoff/acp`).
+
+Host routes share the exact same logic as the tools (enumerateRoutes,
+switchProvider, readAcpSection/writeAcpConfig, exportHandoffForAgent), so the
+GUI and the agent tools can never drift.
+
 ### Soft enhancers (detected, never required)
 
 - **OpenViking**: when `viking_*` tools are present, `handoff_export` embeds
