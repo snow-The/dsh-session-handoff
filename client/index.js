@@ -549,6 +549,13 @@ window.__ModuleLoader__.load({
                         return h("div", {
                           key: m,
                           className: "dsh-ho__fo-combo-item" + (model === m ? " dsh-ho__fo-combo-item--on" : ""),
+                          onMouseDown: function (event) {
+                            // Pick on mousedown + prevent default: the shell may
+                            // blur the input (hiding the :focus-within popup) before
+                            // a click could fire — mousedown guarantees the pick lands.
+                            if (event && event.preventDefault) event.preventDefault();
+                            updateEntry({ model: m });
+                          },
                           onClick: function () { updateEntry({ model: m }); },
                         }, m);
                       }),

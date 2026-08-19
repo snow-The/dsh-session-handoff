@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.5
+
+- **Combobox items are now pickable.** The suggestion popup relies on the
+  input keeping focus (`:focus-within`), and the host shell can blur the input
+  on mousedown — which hid the list before a `click` could fire, so clicking a
+  suggestion did nothing. Items now apply on `onMouseDown` (with
+  `preventDefault`, before any blur) with `click` kept as a fallback, so a
+  suggestion always lands in the model field.
+
 ## v0.17.4
 
 - **Model picker candidates for built-in routes.** `deepseek-official` and
