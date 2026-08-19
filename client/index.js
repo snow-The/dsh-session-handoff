@@ -475,21 +475,28 @@ window.__ModuleLoader__.load({
           );
         });
       }
+      var addProviderValues = [];
       var addOptions = [];
       if (routes !== null) {
-        addOptions = routes
+        addProviderValues = routes
           .filter(function (route) { return failoverList.indexOf(route.provider) === -1; })
-          .map(function (route) {
-            return h("option", { key: route.provider, value: route.provider }, route.provider);
-          });
+          .map(function (route) { return route.provider; });
+        addOptions = addProviderValues.map(function (provider) {
+          return h("option", { key: provider, value: provider }, provider);
+        });
       }
+      // When there is exactly one candidate (or the previous pick is gone),
+      // auto-select it so the add button is never stuck disabled.
+      var addValueEffective = addProviderValues.length === 1
+        ? addProviderValues[0]
+        : (addValue !== "" && addProviderValues.indexOf(addValue) !== -1 ? addValue : "");
       var addRow = [];
       if (routes !== null && routes.length > 0) {
         addRow = [
           h("div", { className: "dsh-ho__fo-add", key: "add" },
             h("select", {
               className: "dsh-ho__fo-select",
-              value: addValue,
+              value: addValueEffective,
               disabled: addOptions.length === 0,
               onChange: function (event) { setAddValue(event.target.value); },
             },
@@ -498,10 +505,10 @@ window.__ModuleLoader__.load({
             h("button", {
               type: "button",
               className: "dsh-ho__button",
-              disabled: addValue === "" || addOptions.length === 0,
+              disabled: addValueEffective === "" || addOptions.length === 0,
               onClick: function () {
-                if (addValue === "") return;
-                setFailoverList(failoverList.concat([addValue]));
+                if (addValueEffective === "") return;
+                setFailoverList(failoverList.concat([addValueEffective]));
                 setAddValue("");
               },
             }, t("failover.add")),
