@@ -503,14 +503,17 @@ window.__ModuleLoader__.load({
             h("div", { className: "dsh-ho__route-main" },
               h("div", { className: "dsh-ho__route-name" }, provider, h("span", { style: { flex: "1 1 auto" } }), badges),
               h("div", { className: "dsh-ho__fo-opts" },
-                h("select", {
+                h("input", {
                   className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
+                  type: "text",
+                  list: "dsh-fo-models-" + provider.replace(/[^A-Za-z0-9_-]/g, "_"),
                   value: model,
+                  placeholder: t("failover.modelFollow"),
                   title: t("failover.model"),
                   onChange: function (event) { updateEntry({ model: event.target.value }); },
-                },
-                  h("option", { key: "__none", value: "" }, t("failover.modelFollow")),
-                  modelOptions.map(function (m) { return h("option", { key: m, value: m }, m); }),
+                }),
+                h("datalist", { id: "dsh-fo-models-" + provider.replace(/[^A-Za-z0-9_-]/g, "_") },
+                  modelOptions.map(function (m) { return h("option", { key: m, value: m }); }),
                 ),
                 h("select", {
                   className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
