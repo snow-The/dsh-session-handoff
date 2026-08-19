@@ -20,23 +20,54 @@ test('FAILOVER_CODES covers quota, rate, server, transport, credential, adapter'
   assert.ok(!FAILOVER_CODES.includes('UNKNOWN'));
 });
 
-test('pickNextProvider returns the first untried route', () => {
-  assert.equal(pickNextProvider(['a', 'b', 'c'], new Set(['a'])), 'b');
-  assert.equal(pickNextProvider(['a', 'b'], new Set()), 'a');
-  assert.equal(pickNextProvider(['a'], new Set(['a'])), null);
+test('pickNextProvider returns the first untried route entry', () => {
+  const entries = [{ provider: 'a' }, { provider: 'b' }, { provider: 'c' }];
+  assert.deepEqual(pickNextProvider(entries, new Set(['a'])), { provider: 'b' });
+  assert.deepEqual(pickNextProvider(entries, new Set()), { provider: 'a' });
+  assert.equal(pickNextProvider([{ provider: 'a' }], new Set(['a'])), null);
   assert.equal(pickNextProvider([], new Set()), null);
 });
 
 test('pickNextProvider skips every tried route in order', () => {
-  assert.equal(pickNextProvider(['a', 'b', 'c'], new Set(['c', 'a'])), 'b');
-  assert.equal(pickNextProvider(['a', 'b', 'c'], new Set(['a', 'b', 'c'])), null);
+  const entries = [{ provider: 'a' }, { provider: 'b' }, { provider: 'c' }];
+  assert.deepEqual(pickNextProvider(entries, new Set(['c', 'a'])), { provider: 'b' });
+  assert.equal(pickNextProvider(entries, new Set(['a', 'b', 'c'])), null);
 });
 
 test('writeFailoverRoutes persists an ordered list and readFailoverRoutes round-trips', async () => {
   const written = await writeFailoverRoutes(['deepseek-official', 'deepseek', 'vision-toolkit-deepseek-official']);
-  assert.deepEqual(written, ['deepseek-official', 'deepseek', 'vision-toolkit-deepseek-official']);
+  assert.deepEqual(written, [
+    { provider: 'deepseek-official' },
+    { provider: 'deepseek' },
+    { provider: 'vision-toolkit-deepseek-official' },
+  ]);
   const read = await readFailoverRoutes();
-  assert.deepEqual(read, ['deepseek-official', 'deepseek', 'vision-toolkit-deepseek-official']);
+  assert.deepEqual(read, [
+    { provider: 'deepseek-official' },
+    { provider: 'deepseek' },
+    { provider: 'vision-toolkit-deepseek-official' },
+  ]);
+});
+
+test('parseFailoverEntry / formatFailoverEntry handle provider:model:effort', () => {
+  const { parseFailoverEntry, formatFailoverEntry } = mod.__internals;
+  assert.deepEqual(parseFailoverEntry('deepseek'), { provider: 'deepseek' });
+  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4-flash'), { provider: 'deepseek', model: 'deepseek-v4-flash' });
+  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4-flash:max'), { provider: 'deepseek', model: 'deepseek-v4-flash', effort: 'max' });
+  assert.equal(parseFailoverEntry(''), null);
+  assert.equal(formatFailoverEntry({ provider: 'a', model: 'm', effort: 'high' }), 'a:m:high');
+  assert.equal(formatFailoverEntry({ provider: 'a' }), 'a');
+});
+
+test('writeFailoverRoutes persists provider:model:effort entries', async () => {
+  await writeFailoverRoutes(['a:m:max', 'b', 'c:n']);
+  assert.match(readFileSync(join(tmp, 'settings.yaml'), 'utf8'), /failoverRoutes: a:m:max,b,c:n/);
+  const read = await readFailoverRoutes();
+  assert.deepEqual(read, [
+    { provider: 'a', model: 'm', effort: 'max' },
+    { provider: 'b' },
+    { provider: 'c', model: 'n' },
+  ]);
 });
 
 test('writeFailoverRoutes merges into an existing settings.yaml section', async () => {
@@ -54,7 +85,7 @@ test('writeFailoverRoutes merges into an existing settings.yaml section', async 
   const text = readFileSync(join(tmp, 'settings.yaml'), 'utf8');
   assert.match(text, /failoverRoutes: deepseek,deepseek-official/);
   assert.match(text, /minContextLimit: "60%"/); // sibling key untouched
-  assert.deepEqual(await readFailoverRoutes(), ['deepseek', 'deepseek-official']);
+  assert.deepEqual(await readFailoverRoutes(), [{ provider: 'deepseek' }, { provider: 'deepseek-official' }]);
 });
 
 test('empty list disables failover and removes the line', async () => {
@@ -122,6 +153,28 @@ test('installFailover alternates a->b->c through the priority list on quota erro
     () => 'CONTINUE',
   );
   assert.equal(r3, 'CONTINUE');
+
+  dispose();
+});
+
+test('installFailover applies per-route model + effort overrides on switch', async () => {
+  await writeFailoverRoutes(['a:model-a:max', 'b:model-b:high']);
+  const { ctx, handlers } = makeCtx();
+  const dispose = mod.installFailover(ctx);
+  const agent = { id: 'sess', session: { append: () => {} } };
+
+  // Seed request is on 'a' with a different model/effort; it fails with QUOTA.
+  const r1 = await handlers['agent/request-error'](
+    { agent, turn: 9, step: 1, provider: 'a', failure: { code: 'QUOTA' }, signal: {} },
+    () => 'CONTINUE',
+  );
+  assert.deepEqual(r1, { kind: 'retry' });
+  // Rebuilt request on 'b' must carry entry 'b' pinned model + effort.
+  const seedB = await handlers['agent/request'](
+    { agent, turn: 9, step: 1 },
+    () => ({ provider: 'a', model: 'seed-model', reasoningEffort: 'low' }),
+  );
+  assert.deepEqual(seedB, { provider: 'b', model: 'model-b', reasoningEffort: 'high' });
 
   dispose();
 });

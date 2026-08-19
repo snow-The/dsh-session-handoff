@@ -16,8 +16,9 @@ all progress. This plugin fixes both halves — and more:
    window fills (official compaction API, model-authored summaries).
 3. **Session management** — trash / restore / purge / list sessions.
 4. **Model routes** — every registered route (official API, Ark, custom,
-   vision-toolkit wrappers) is orderable and switchable; no model id is
-   hard-coded.
+   vision-toolkit wrappers) is orderable and switchable; each route can pin
+   its own model and reasoning effort (`provider:model:effort`), or follow
+   the chat's current selection. No model id is hard-coded.
 5. **ACP thresholds** — tune compaction limits without touching YAML.
 
 ## Tools

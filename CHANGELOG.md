@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.17.0
+
+- **Per-route model + reasoning effort.** A failover route is now
+  `provider[:model[:effort]]` — the panel has a model dropdown (the
+  provider's registered models, or blank = follow the chat's model) and a
+  reasoning-effort dropdown (max/high/medium/low/none, or blank = follow
+  current) on every route. On failover the rebuilt request applies the pinned
+  model / effort (true cross-model switching).
+- `model_switch` and the `/switch` route accept optional `model` /
+  `reasoningEffort` and preserve the current default's effort (no more
+  hard-coded `max`).
+- Settings line format is backward compatible: `failoverRoutes:
+  deepseek,deepseek-official` still works (each entry just provider).
+- New tests: entry parse/format, `provider:model:effort` persistence,
+  per-route override applied on switch. 48 tests total.
+
 ## v0.16.0
 
 - **Generic routes — no fixed model id.** Every registered provider route

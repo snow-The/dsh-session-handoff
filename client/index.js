@@ -67,6 +67,10 @@ window.__ModuleLoader__.load({
       "failover.saved": "优先级已保存，新请求生效",
       "failover.saveFailed": "保存失败：{error}",
       "failover.empty": "所有可用路由都已加入列表",
+      "failover.model": "模型（留空 = 跟随当前）",
+      "failover.effort": "推理等级（留空 = 跟随当前）",
+      "failover.modelFollow": "跟随当前",
+      "failover.effortFollow": "跟随当前",
       "export.title": "会话交接",
       "export.hint": "把当前会话导出为结构化交接文档（.dsh-handoff/），新会话可直接续接。",
       "export.current": "当前会话：{session}",
@@ -118,6 +122,10 @@ window.__ModuleLoader__.load({
       "failover.saved": "Priority saved, active for new requests",
       "failover.saveFailed": "Save failed: {error}",
       "failover.empty": "Every available route is already in the list",
+      "failover.model": "model (blank = follow current)",
+      "failover.effort": "reasoning effort (blank = follow current)",
+      "failover.modelFollow": "follow current",
+      "failover.effortFollow": "follow current",
       "export.title": "Session handoff",
       "export.hint": "Export the current session into a structured handoff document (.dsh-handoff/) a fresh session can resume from.",
       "export.current": "Current session: {session}",
@@ -172,6 +180,8 @@ window.__ModuleLoader__.load({
       ".dsh-ho__fo-row--drag{opacity:.45}",
       ".dsh-ho__fo-idx{flex:none;width:20px;text-align:center;color:var(--dsw-alias-label-tertiary,inherit);font-size:12px;font-family:ui-monospace,Consolas,monospace}",
       ".dsh-ho__fo-handle{flex:none;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:grab;user-select:none;line-height:1}",
+      ".dsh-ho__fo-opts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}",
+      ".dsh-ho__fo-select--sm{max-width:220px;padding:2px 6px;font-size:12px}",
       ".dsh-ho__fo-remove{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;flex:none}",
       ".dsh-ho__fo-remove:hover{color:var(--dsw-alias-label-error,#d93025);background:var(--dsw-alias-bg-module-platform,transparent)}",
       ".dsh-ho__fo-add{display:flex;align-items:center;gap:8px;margin-top:6px}",
@@ -415,7 +425,10 @@ window.__ModuleLoader__.load({
       if (failoverLoaded && routes !== null) {
         var routeById = {};
         routes.forEach(function (route) { routeById[route.provider] = route; });
-        failoverRows = failoverList.map(function (provider, index) {
+        failoverRows = failoverList.map(function (entry, index) {
+          var provider = typeof entry === 'string' ? entry : entry.provider;
+          var model = typeof entry === 'string' ? '' : (entry.model || '');
+          var effort = typeof entry === 'string' ? '' : (entry.effort || '');
           var route = routeById[provider] || null;
           var badges = [];
           if (route !== null) {
@@ -427,6 +440,23 @@ window.__ModuleLoader__.load({
             } else {
               badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--builtin", key: "k" }, (route.keyEnv || "?") + " [" + (route.keyFamily || "?") + "]"));
             }
+          }
+          // Per-route model picker: the provider's registered models + the
+          // currently pinned model (if any) + "" = follow the chat's model.
+          var modelOptions = [];
+          if (route !== null && Array.isArray(route.models)) {
+            route.models.forEach(function (m) {
+              if (m && modelOptions.indexOf(m) === -1) modelOptions.push(m);
+            });
+          }
+          if (model && modelOptions.indexOf(model) === -1) modelOptions.push(model);
+          var effortOptions = ["", "max", "high", "medium", "low", "none"];
+          function updateEntry(patch) {
+            setFailoverList(failoverList.map(function (e) {
+              var p = typeof e === 'string' ? e : e.provider;
+              if (p !== provider) return e;
+              return Object.assign({}, (typeof e === 'string' ? { provider: e } : e), patch);
+            }));
           }
           var actions = [];
           if (route !== null) {
@@ -446,7 +476,9 @@ window.__ModuleLoader__.load({
             className: "dsh-ho__fo-remove",
             title: t("failover.remove"),
             onClick: function () {
-              setFailoverList(failoverList.filter(function (p) { return p !== provider; }));
+              setFailoverList(failoverList.filter(function (e) {
+                return (typeof e === 'string' ? e : e.provider) !== provider;
+              }));
             },
           }, "✕"));
           return h("div", {
@@ -470,6 +502,27 @@ window.__ModuleLoader__.load({
             h("span", { className: "dsh-ho__fo-idx" }, String(index + 1) + "."),
             h("div", { className: "dsh-ho__route-main" },
               h("div", { className: "dsh-ho__route-name" }, provider, h("span", { style: { flex: "1 1 auto" } }), badges),
+              h("div", { className: "dsh-ho__fo-opts" },
+                h("select", {
+                  className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
+                  value: model,
+                  title: t("failover.model"),
+                  onChange: function (event) { updateEntry({ model: event.target.value }); },
+                },
+                  h("option", { key: "__none", value: "" }, t("failover.modelFollow")),
+                  modelOptions.map(function (m) { return h("option", { key: m, value: m }, m); }),
+                ),
+                h("select", {
+                  className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
+                  value: effort,
+                  title: t("failover.effort"),
+                  onChange: function (event) { updateEntry({ effort: event.target.value }); },
+                },
+                  effortOptions.map(function (v) {
+                    return h("option", { key: v, value: v }, v === "" ? t("failover.effortFollow") : v);
+                  }),
+                ),
+              ),
             ),
             h("div", { className: "dsh-ho__actions" }, actions),
           );
@@ -479,7 +532,9 @@ window.__ModuleLoader__.load({
       var addOptions = [];
       if (routes !== null) {
         addProviderValues = routes
-          .filter(function (route) { return failoverList.indexOf(route.provider) === -1; })
+          .filter(function (route) {
+            return !failoverList.some(function (e) { return (typeof e === 'string' ? e : e.provider) === route.provider; });
+          })
           .map(function (route) { return route.provider; });
         addOptions = addProviderValues.map(function (provider) {
           return h("option", { key: provider, value: provider }, provider);
@@ -508,7 +563,7 @@ window.__ModuleLoader__.load({
               disabled: addValueEffective === "" || addOptions.length === 0,
               onClick: function () {
                 if (addValueEffective === "") return;
-                setFailoverList(failoverList.concat([addValueEffective]));
+                setFailoverList(failoverList.concat([{ provider: addValueEffective }]));
                 setAddValue("");
               },
             }, t("failover.add")),
