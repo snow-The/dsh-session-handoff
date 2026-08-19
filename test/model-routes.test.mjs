@@ -52,7 +52,29 @@ test('enumerateRoutes lists configured + built-in routes with default marker', (
   assert.equal(ds.keyEnv, 'ARK_API_KEY');
   const off = routes.find((r) => r.provider === 'deepseek-official');
   assert.equal(off.default, true, 'vision-toolkit- variant counts as default');
-  assert.equal(off.visionVariant, 'vision-toolkit-deepseek-official');
+  assert.equal(off.vision, false, 'bare route is not a vision wrapper');
+});
+
+test('enumerateRoutes marks the chat-context selection via requestContext', () => {
+  const { enumerateRoutes } = mod;
+  // llm directory (chat model list): raw + vision-toolkit wrappers.
+  const ctx = {
+    get: () => ({ listProviders: () => [
+      { id: 'deepseek' },
+      { id: 'deepseek-official' },
+      { id: 'vision-toolkit-deepseek' },
+      { id: 'vision-toolkit-deepseek-official' },
+    ] }),
+  };
+  // The running session is on the vision-toolkit-deepseek wrapper (Ark + vision).
+  const routes = enumerateRoutes(ctx, { provider: 'vision-toolkit-deepseek', model: 'deepseek-v4-flash', contextWindow: 1000000 });
+  const wrapped = routes.find((r) => r.provider === 'vision-toolkit-deepseek');
+  assert.ok(wrapped, 'vision wrapper appears in the route list (chat model list)');
+  assert.equal(wrapped.inUse, true, 'wrapper is the in-use chat model');
+  assert.equal(wrapped.currentModel, 'deepseek-v4-flash');
+  assert.equal(wrapped.vision, true);
+  const raw = routes.find((r) => r.provider === 'deepseek');
+  assert.equal(raw.inUse, true, 'raw route is also marked when its wrapper is in use');
 });
 
 test('cleanup', () => {

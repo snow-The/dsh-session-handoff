@@ -57,6 +57,7 @@ window.__ModuleLoader__.load({
       "routes.builtin": "内置路由",
       "routes.configured": "已配置路由",
       "routes.keyMissing": "未找到密钥",
+      "routes.current": "当前聊天模型：{provider} @ {model}",
       "failover.title": "自动切换（故障转移）",
       "failover.off": "未启用——加入至少一个路由后，模型不可用/额度耗尽时会自动切换。",
       "failover.add": "添加",
@@ -107,6 +108,7 @@ window.__ModuleLoader__.load({
       "routes.builtin": "built-in route",
       "routes.configured": "configured route",
       "routes.keyMissing": "no key found",
+      "routes.current": "Current chat model: {provider} @ {model}",
       "failover.title": "Auto failover",
       "failover.off": "Disabled — add at least one route and unreachable / out-of-quota models switch automatically.",
       "failover.add": "Add",
@@ -280,6 +282,9 @@ window.__ModuleLoader__.load({
       var busyFailoverPair = useState(false);
       var busyFailover = busyFailoverPair[0];
       var setBusyFailover = busyFailoverPair[1];
+      var currentPair = useState(null);
+      var currentChat = currentPair[0];
+      var setCurrentChat = currentPair[1];
 
       var load = useCallback(async function load() {
         try {
@@ -291,6 +296,7 @@ window.__ModuleLoader__.load({
             var initialVision = {};
             r.routes.forEach(function (route) { initialVision[route.provider] = false; });
             setVision(initialVision);
+            setCurrentChat(r.current && r.current.provider ? r.current : null);
           } else {
             setRoutesError(r && r.error ? r.error : "bad-response");
           }
@@ -324,7 +330,7 @@ window.__ModuleLoader__.load({
         if (busySwitch !== null) return;
         setBusySwitch(route.provider);
         setMessage("");
-        apiPost("/switch", { provider: route.provider, vision: vision[route.provider] === true })
+        apiPost("/switch", { provider: route.provider })
           .then(function (result) {
             if (result && result.ok === true) {
               setMessage(t("routes.switched", { provider: result.provider }));
@@ -424,19 +430,6 @@ window.__ModuleLoader__.load({
           }
           var actions = [];
           if (route !== null) {
-            actions.push(h("label", { className: "dsh-ho__checkbox", key: "v", title: t("routes.vision") },
-              h("input", {
-                type: "checkbox",
-                checked: vision[provider] === true,
-                disabled: busySwitch !== null,
-                onChange: function (event) {
-                  var next = Object.assign({}, vision);
-                  next[provider] = event.target.checked;
-                  setVision(next);
-                },
-              }),
-              t("routes.vision"),
-            ));
             if (!route.default) {
               actions.push(h("button", {
                 type: "button",
@@ -595,6 +588,7 @@ window.__ModuleLoader__.load({
         h("div", { className: "dsh-ho__card" },
           h("p", { className: "dsh-ho__title" }, t("routes.title")),
           h("p", { className: "dsh-ho__hint" }, t("routes.hint")),
+          currentChat !== null ? h("p", { className: "dsh-ho__msg", key: "cur" }, t("routes.current", { provider: currentChat.provider, model: currentChat.model })) : null,
           routes === null && routesError === "" ? h("div", { className: "dsh-ho__skeleton", key: "sk" },
             h("div", { className: "dsh-ho__skeleton-bar", style: { width: "85%" } }),
             h("div", { className: "dsh-ho__skeleton-bar", style: { width: "60%" } }),

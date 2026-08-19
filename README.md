@@ -76,9 +76,11 @@ The plugin ships a hand-written client bundle (`client/index.js`, no build
 step) that registers a **Settings section "模型路由 / Model Routes"** in the
 web GUI, mirroring the host tools as clickable controls:
 
-- **Model routes panel** — every route serving `deepseek-v4-flash` (official /
-  Ark / custom), key family badge, default marker, one-click "Set default"
-  (with an optional vision-variant checkbox).
+- **Model routes panel** — every route in the live model directory (the same
+  list the chat dialog offers, incl. any vision-toolkit wrappers), with the
+  current chat-context selection shown (`session.requestContext()`). No
+  vision model is configured here — the chat dialog's own model list is the
+  source of truth; ordering is yours.
 - **Auto failover (priority list)** — drag-to-reorder the routes, delete or
   add entries, save the priority. When the active model is unreachable or
   out of quota (`QUOTA` / `RATE_LIMIT` / `SERVER` / `TIMEOUT` / `TRANSPORT` /

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.15.0
+
+- **Chat model list is the source of truth** (no self-configured vision
+  model): the routes panel/tool reads the running session's
+  `requestContext()` — the model actually last chosen in the chat dialog —
+  and derives the candidate pool from the live `llm` directory
+  (`ctx.llm.listProviders()`), so vision-toolkit wrapper providers appear
+  naturally as ordinary sortable entries. Ordering is entirely the user's job.
+- `model_switch` no longer recommends/writes a vision wrapper — it points
+  agent-default-model at exactly the provider you pick. Failover stays dumb
+  and predictable: on a failed step it tries the next provider in the saved
+  priority list in order (`failoverRoutes`), skipping only what already
+  failed this step; user interruptions never switch.
+
 ## v0.14.0
 
 - **Provider failover (auto route switching)** — the core ask: a priority
