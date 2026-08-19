@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.16.0
+
+- **Generic routes — no fixed model id.** Every registered provider route
+  (llm directory + `llm-pi-ai.providers.*` + built-ins, incl. any
+  vision-toolkit wrappers) is a first-class route you can order, switch to,
+  and fail over to. `model_switch` now preserves the currently selected model
+  instead of forcing `deepseek-v4-flash`. Tool descriptions and panel copy
+  are model-agnostic ("registered route").
+- **Failover alternation fixed (real bug caught by the new test).** The
+  tried-provider set is now preserved across the error → request → error
+  cycle, so a second failure advances to the *next* route (A→B→C) instead of
+  looping back to the first (A→B→A→B…). Entries are TTL-pruned (10 min) to
+  bound memory.
+- **New installFailover tests** drive the full event chain
+  (`agent/request-error` → retry → `agent/request` rebind): a→b→c
+  alternation, interruption never switches, non-failover codes ignored,
+  safe no-op without an event bus. 45 tests total.
+
 ## v0.15.0
 
 - **Chat model list is the source of truth** (no self-configured vision

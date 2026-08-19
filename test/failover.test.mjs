@@ -69,4 +69,103 @@ test('readFailoverRoutes returns [] when the section is absent', async () => {
   assert.deepEqual(await readFailoverRoutes(), []);
 });
 
+// --- installFailover: full event-driven alternation (the real switch path) ---
+
+function makeCtx() {
+  const handlers = {};
+  const events = [];
+  return {
+    ctx: {
+      on(name, fn) { handlers[name] = fn; return () => {}; },
+      logger: { info: (s) => events.push(s) },
+      tools: { register: () => {} },
+    },
+    handlers,
+    events,
+  };
+}
+
+test('installFailover alternates a->b->c through the priority list on quota errors', async () => {
+  await writeFailoverRoutes(['a', 'b', 'c']);
+  const { ctx, handlers } = makeCtx();
+  const dispose = mod.installFailover(ctx);
+  const agent = { id: 'sess', session: { append: () => {} } };
+
+  // 1st request runs on 'a'; it fails with QUOTA → handler asks for retry.
+  const r1 = await handlers['agent/request-error'](
+    { agent, turn: 1, step: 1, provider: 'a', failure: { code: 'QUOTA', message: 'no quota' }, signal: {} },
+    () => 'CONTINUE',
+  );
+  assert.deepEqual(r1, { kind: 'retry' });
+  // Next request is rebuilt on the next route 'b' (model preserved).
+  const seedB = await handlers['agent/request'](
+    { agent, turn: 1, step: 1 },
+    () => ({ provider: 'a', model: 'm' }),
+  );
+  assert.deepEqual(seedB, { provider: 'b', model: 'm' });
+
+  // 2nd failure on 'b' (RATE_LIMIT) → next route 'c'.
+  const r2 = await handlers['agent/request-error'](
+    { agent, turn: 1, step: 1, provider: 'b', failure: { code: 'RATE_LIMIT' }, signal: {} },
+    () => 'CONTINUE',
+  );
+  assert.deepEqual(r2, { kind: 'retry' });
+  const seedC = await handlers['agent/request'](
+    { agent, turn: 1, step: 1 },
+    () => ({ provider: 'b', model: 'm' }),
+  );
+  assert.deepEqual(seedC, { provider: 'c', model: 'm' });
+
+  // 3rd failure on 'c' → every route tried → original error surfaces (no retry).
+  const r3 = await handlers['agent/request-error'](
+    { agent, turn: 1, step: 1, provider: 'c', failure: { code: 'SERVER' }, signal: {} },
+    () => 'CONTINUE',
+  );
+  assert.equal(r3, 'CONTINUE');
+
+  dispose();
+});
+
+test('installFailover never switches on user interruption', async () => {
+  await writeFailoverRoutes(['a', 'b']);
+  const { ctx, handlers } = makeCtx();
+  const dispose = mod.installFailover(ctx);
+  const agent = { id: 'sess', session: { append: () => {} } };
+
+  const r = await handlers['agent/request-error'](
+    { agent, turn: 2, step: 1, provider: 'a', failure: { code: 'QUOTA' }, signal: { aborted: true } },
+    () => 'CONTINUE',
+  );
+  assert.equal(r, 'CONTINUE');
+  // No pending state → next request keeps the original provider.
+  const seed = await handlers['agent/request'](
+    { agent, turn: 2, step: 1 },
+    () => ({ provider: 'a', model: 'm' }),
+  );
+  assert.deepEqual(seed, { provider: 'a', model: 'm' });
+
+  dispose();
+});
+
+test('installFailover ignores non-failover error codes', async () => {
+  await writeFailoverRoutes(['a', 'b']);
+  const { ctx, handlers } = makeCtx();
+  const dispose = mod.installFailover(ctx);
+  const agent = { id: 'sess', session: { append: () => {} } };
+
+  const r = await handlers['agent/request-error'](
+    { agent, turn: 3, step: 1, provider: 'a', failure: { code: 'UNKNOWN' }, signal: {} },
+    () => 'CONTINUE',
+  );
+  assert.equal(r, 'CONTINUE');
+
+  dispose();
+});
+
+test('installFailover is a safe no-op when ctx.on is absent', () => {
+  const dispose = mod.installFailover({});
+  assert.equal(typeof dispose, 'function');
+  assert.doesNotThrow(() => dispose());
+});
+
 after(() => rmSync(tmp, { recursive: true, force: true }));

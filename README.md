@@ -15,8 +15,9 @@ all progress. This plugin fixes both halves — and more:
 2. **Active context pruning** — compress spent history before the context
    window fills (official compaction API, model-authored summaries).
 3. **Session management** — trash / restore / purge / list sessions.
-4. **Model routes** — share one model id (e.g. deepseek-v4-flash) across
-   several vendors/plans (official API, Ark, …) and switch between them.
+4. **Model routes** — every registered route (official API, Ark, custom,
+   vision-toolkit wrappers) is orderable and switchable; no model id is
+   hard-coded.
 5. **ACP thresholds** — tune compaction limits without touching YAML.
 
 ## Tools
