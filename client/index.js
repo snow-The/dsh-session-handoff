@@ -433,6 +433,20 @@ window.__ModuleLoader__.load({
       if (failoverLoaded && routes !== null) {
         var routeById = {};
         routes.forEach(function (route) { routeById[route.provider] = route; });
+        // Aggregate model suggestions: every model registered on ANY route, so
+        // built-in routes (deepseek-official etc.) still get clickable candidates.
+        var allModels = [];
+        routes.forEach(function (route) {
+          if (route && Array.isArray(route.models)) {
+            route.models.forEach(function (m) {
+              if (m && allModels.indexOf(m) === -1) allModels.push(m);
+            });
+          }
+        });
+        var BUILTIN_DEFAULTS = {
+          "deepseek-official": ["deepseek-chat", "deepseek-reasoner"],
+          "deepseek": ["deepseek-v4-flash"],
+        };
         failoverRows = failoverList.map(function (entry, index) {
           var provider = typeof entry === 'string' ? entry : entry.provider;
           var model = typeof entry === 'string' ? '' : (entry.model || '');
@@ -449,14 +463,19 @@ window.__ModuleLoader__.load({
               badges.push(h("span", { className: "dsh-ho__badge dsh-ho__badge--builtin", key: "k" }, (route.keyEnv || "?") + " [" + (route.keyFamily || "?") + "]"));
             }
           }
-          // Per-route model picker: the provider's registered models + the
-          // currently pinned model (if any) + "" = follow the chat's model.
+          // Per-route model picker: registered models for registered routes;
+          // built-in routes (no registered models) fall back to the union of
+          // every route's models + provider defaults + the chat's current
+          // model + the pinned model — always a non-empty suggestion list.
           var modelOptions = [];
-          if (route !== null && Array.isArray(route.models)) {
-            route.models.forEach(function (m) {
-              if (m && modelOptions.indexOf(m) === -1) modelOptions.push(m);
-            });
-          }
+          var ownModels = route !== null && Array.isArray(route.models) ? route.models : [];
+          var suggestFrom = ownModels.length > 0
+            ? ownModels
+            : allModels.concat(BUILTIN_DEFAULTS[provider] || []);
+          suggestFrom.forEach(function (m) {
+            if (m && modelOptions.indexOf(m) === -1) modelOptions.push(m);
+          });
+          if (currentChat !== null && currentChat.model && modelOptions.indexOf(currentChat.model) === -1) modelOptions.push(currentChat.model);
           if (model && modelOptions.indexOf(model) === -1) modelOptions.push(model);
           var effortOptions = ["", "max", "high", "medium", "low", "none"];
           function updateEntry(patch) {
@@ -521,7 +540,7 @@ window.__ModuleLoader__.load({
                     onChange: function (event) { updateEntry({ model: event.target.value }); },
                   }),
                   h("div", { className: "dsh-ho__fo-combo-list" },
-                    (modelOptions.length > 0 ? modelOptions : (currentChat !== null && currentChat.model ? [currentChat.model] : []))
+                    modelOptions
                       .filter(function (m) {
                         if (model === "") return true;
                         return m.toLowerCase().indexOf(model.toLowerCase()) !== -1;

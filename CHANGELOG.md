@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.4
+
+- **Model picker candidates for built-in routes.** `deepseek-official` and
+  other routes without registered models now get a non-empty suggestion list:
+  the union of every route's registered models + provider-known defaults
+  (`deepseek-official` → `deepseek-chat` / `deepseek-reasoner`) + the chat's
+  current model + the pinned model, deduped. The combobox (v0.17.3) always has
+  something to show on focus; typing still filters, and free text is accepted.
+
 ## v0.17.0
 
 - **Per-route model + reasoning effort.** A failover route is now
