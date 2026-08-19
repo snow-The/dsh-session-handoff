@@ -182,6 +182,10 @@ window.__ModuleLoader__.load({
       ".dsh-ho__fo-handle{flex:none;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:grab;user-select:none;line-height:1}",
       ".dsh-ho__fo-opts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}",
       ".dsh-ho__fo-select--sm{max-width:220px;padding:2px 6px;font-size:12px}",
+      ".dsh-ho__fo-chips{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}",
+      ".dsh-ho__fo-chip{border:1px solid var(--dsw-alias-border-l2,currentColor);background:var(--dsw-alias-bg-layer-1,transparent);color:inherit;border-radius:10px;padding:1px 8px;font-size:11px;cursor:pointer;line-height:1.5}",
+      ".dsh-ho__fo-chip:hover{border-color:var(--dsw-alias-brand,currentColor)}",
+      ".dsh-ho__fo-chip--on{border-color:var(--dsw-alias-brand,currentColor);background:var(--dsw-alias-brand,currentColor);color:var(--dsw-alias-bg-base,#fff)}",
       ".dsh-ho__fo-remove{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;flex:none}",
       ".dsh-ho__fo-remove:hover{color:var(--dsw-alias-label-error,#d93025);background:var(--dsw-alias-bg-module-platform,transparent)}",
       ".dsh-ho__fo-add{display:flex;align-items:center;gap:8px;margin-top:6px}",
@@ -506,15 +510,11 @@ window.__ModuleLoader__.load({
                 h("input", {
                   className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
                   type: "text",
-                  list: "dsh-fo-models-" + provider.replace(/[^A-Za-z0-9_-]/g, "_"),
                   value: model,
                   placeholder: t("failover.modelFollow"),
                   title: t("failover.model"),
                   onChange: function (event) { updateEntry({ model: event.target.value }); },
                 }),
-                h("datalist", { id: "dsh-fo-models-" + provider.replace(/[^A-Za-z0-9_-]/g, "_") },
-                  modelOptions.map(function (m) { return h("option", { key: m, value: m }); }),
-                ),
                 h("select", {
                   className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
                   value: effort,
@@ -525,6 +525,17 @@ window.__ModuleLoader__.load({
                     return h("option", { key: v, value: v }, v === "" ? t("failover.effortFollow") : v);
                   }),
                 ),
+              ),
+              h("div", { className: "dsh-ho__fo-chips" },
+                (modelOptions.length > 0 ? modelOptions : (currentChat !== null && currentChat.model ? [currentChat.model] : []))
+                  .map(function (m) {
+                    return h("button", {
+                      type: "button",
+                      key: m,
+                      className: "dsh-ho__fo-chip" + (model === m ? " dsh-ho__fo-chip--on" : ""),
+                      onClick: function () { updateEntry({ model: m }); },
+                    }, m);
+                  }),
               ),
             ),
             h("div", { className: "dsh-ho__actions" }, actions),
