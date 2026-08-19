@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.17.9
+
+- **Model and effort fields are now labeled.** Both fields showed "跟随当前"
+  when unset, which read as one duplicated/overlapping control. Each field now
+  has a small leading label (模型 / 推理等级, Model / Effort), so the two
+  controls stay visually distinct even when both values are "follow current".
+
 ## v0.17.8
 
 - **Popup no longer overlaps the effort select.** The suggestion popup was

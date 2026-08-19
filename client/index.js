@@ -71,6 +71,8 @@ window.__ModuleLoader__.load({
       "failover.effort": "推理等级（留空 = 跟随当前）",
       "failover.modelFollow": "跟随当前",
       "failover.effortFollow": "跟随当前",
+      "failover.modelLabel": "模型",
+      "failover.effortLabel": "推理等级",
       "export.title": "会话交接",
       "export.hint": "把当前会话导出为结构化交接文档（.dsh-handoff/），新会话可直接续接。",
       "export.current": "当前会话：{session}",
@@ -126,6 +128,8 @@ window.__ModuleLoader__.load({
       "failover.effort": "reasoning effort (blank = follow current)",
       "failover.modelFollow": "follow current",
       "failover.effortFollow": "follow current",
+      "failover.modelLabel": "Model",
+      "failover.effortLabel": "Effort",
       "export.title": "Session handoff",
       "export.hint": "Export the current session into a structured handoff document (.dsh-handoff/) a fresh session can resume from.",
       "export.current": "Current session: {session}",
@@ -181,6 +185,8 @@ window.__ModuleLoader__.load({
       ".dsh-ho__fo-idx{flex:none;width:20px;text-align:center;color:var(--dsw-alias-label-tertiary,inherit);font-size:12px;font-family:ui-monospace,Consolas,monospace}",
       ".dsh-ho__fo-handle{flex:none;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:grab;user-select:none;line-height:1}",
       ".dsh-ho__fo-opts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}",
+      ".dsh-ho__fo-field{display:flex;align-items:center;gap:4px;min-width:0}",
+      ".dsh-ho__fo-label{font-size:11px;color:var(--dsw-alias-label-tertiary,#9aa0a6);flex:none;white-space:nowrap}",
       ".dsh-ho__fo-select--sm{max-width:220px;padding:2px 6px;font-size:12px}",
       ".dsh-ho__fo-chips{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}",
       ".dsh-ho__fo-combo{position:relative;display:inline-block;min-width:180px}",
@@ -549,7 +555,9 @@ window.__ModuleLoader__.load({
             h("div", { className: "dsh-ho__route-main" },
               h("div", { className: "dsh-ho__route-name" }, provider, h("span", { style: { flex: "1 1 auto" } }), badges),
               h("div", { className: "dsh-ho__fo-opts" },
-                h("div", { className: "dsh-ho__fo-combo" },
+                h("label", { className: "dsh-ho__fo-field" },
+                  h("span", { className: "dsh-ho__fo-label" }, t("failover.modelLabel")),
+                  h("div", { className: "dsh-ho__fo-combo" },
                   h("input", {
                     className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
                     type: "text",
@@ -612,9 +620,12 @@ window.__ModuleLoader__.load({
                         onClick: function () { updateEntry({ model: m }); },
                       }, highlightMatch(m, model));
                     }),
+                    ),
                   ),
                 ),
-                h("select", {
+                h("label", { className: "dsh-ho__fo-field" },
+                  h("span", { className: "dsh-ho__fo-label" }, t("failover.effortLabel")),
+                  h("select", {
                   className: "dsh-ho__fo-select dsh-ho__fo-select--sm",
                   value: effort,
                   title: t("failover.effort"),
@@ -623,6 +634,7 @@ window.__ModuleLoader__.load({
                   effortOptions.map(function (v) {
                     return h("option", { key: v, value: v }, v === "" ? t("failover.effortFollow") : v);
                   }),
+                  ),
                 ),
               ),
             ),
