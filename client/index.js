@@ -190,8 +190,8 @@ window.__ModuleLoader__.load({
       ".dsh-ho__fo-combo-item{padding:3px 8px;font-size:12px;cursor:pointer;white-space:nowrap}",
       ".dsh-ho__fo-combo-item:hover{background:var(--dsw-alias-bg-layer-2,currentColor)}",
       ".dsh-ho__fo-combo-item--on{color:var(--dsw-alias-brand,currentColor);font-weight:600}",
-      ".dsh-ho__fo-combo-item--active{background:var(--dsw-alias-bg-layer-2,currentColor)}",
-      ".dsh-ho__fo-combo-hit{color:var(--dsw-alias-brand,currentColor);font-weight:600}",
+      ".dsh-ho__fo-combo-item--active{background:rgba(127,127,127,.28)}",
+      ".dsh-ho__fo-combo-hit{color:var(--dsw-alias-brand,#4c8dff);font-weight:600;text-decoration:underline}",
       ".dsh-ho__fo-remove{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;flex:none}",
       ".dsh-ho__fo-remove:hover{color:var(--dsw-alias-label-error,#d93025);background:var(--dsw-alias-bg-module-platform,transparent)}",
       ".dsh-ho__fo-add{display:flex;align-items:center;gap:8px;margin-top:6px}",
@@ -575,6 +575,15 @@ window.__ModuleLoader__.load({
                         if (n > 0) {
                           var pick = filtered[Math.min(Math.max(activeIndex, 0), n - 1)];
                           updateEntry({ model: pick });
+                          if (event.target && event.target.blur) event.target.blur();
+                        }
+                      } else if (k === "Tab") {
+                        // Tab also completes (shell/IDE style); without
+                        // suggestions it keeps the default focus move.
+                        if (n > 0) {
+                          if (event.preventDefault) event.preventDefault();
+                          var pickTab = filtered[Math.min(Math.max(activeIndex, 0), n - 1)];
+                          updateEntry({ model: pickTab });
                           if (event.target && event.target.blur) event.target.blur();
                         }
                       } else if (k === "Escape") {

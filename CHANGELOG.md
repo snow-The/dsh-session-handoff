@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.7
+
+- **Visible highlighting + Tab completion.** Highlight styles no longer depend
+  on host CSS variables (which the shell may not define): the active
+  suggestion gets a theme-neutral translucent background and the matched
+  substring gets a blue underline. `Tab` now completes like `Enter` (applies
+  the highlighted suggestion and closes the popup; without suggestions it
+  keeps the default focus move).
+
 ## v0.17.6
 
 - **Combobox keyboard selection + match highlighting.** The typed text no
