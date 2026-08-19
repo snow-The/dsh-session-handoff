@@ -190,6 +190,8 @@ window.__ModuleLoader__.load({
       ".dsh-ho__fo-combo-item{padding:3px 8px;font-size:12px;cursor:pointer;white-space:nowrap}",
       ".dsh-ho__fo-combo-item:hover{background:var(--dsw-alias-bg-layer-2,currentColor)}",
       ".dsh-ho__fo-combo-item--on{color:var(--dsw-alias-brand,currentColor);font-weight:600}",
+      ".dsh-ho__fo-combo-item--active{background:var(--dsw-alias-bg-layer-2,currentColor)}",
+      ".dsh-ho__fo-combo-hit{color:var(--dsw-alias-brand,currentColor);font-weight:600}",
       ".dsh-ho__fo-remove{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,inherit);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;flex:none}",
       ".dsh-ho__fo-remove:hover{color:var(--dsw-alias-label-error,#d93025);background:var(--dsw-alias-bg-module-platform,transparent)}",
       ".dsh-ho__fo-add{display:flex;align-items:center;gap:8px;margin-top:6px}",
@@ -303,6 +305,9 @@ window.__ModuleLoader__.load({
       var currentPair = useState(null);
       var currentChat = currentPair[0];
       var setCurrentChat = currentPair[1];
+      var activeIndexPair = useState(-1);
+      var activeIndex = activeIndexPair[0];
+      var setActiveIndex = activeIndexPair[1];
 
       var load = useCallback(async function load() {
         try {
@@ -476,7 +481,21 @@ window.__ModuleLoader__.load({
             if (m && modelOptions.indexOf(m) === -1) modelOptions.push(m);
           });
           if (currentChat !== null && currentChat.model && modelOptions.indexOf(currentChat.model) === -1) modelOptions.push(currentChat.model);
-          if (model && modelOptions.indexOf(model) === -1) modelOptions.push(model);
+          // Filtered view drives both the popup and keyboard navigation.
+          var filtered = modelOptions.filter(function (m) {
+            if (model === "") return true;
+            return m.toLowerCase().indexOf(model.toLowerCase()) !== -1;
+          });
+          function highlightMatch(m, q) {
+            if (q === "") return m;
+            var idx = m.toLowerCase().indexOf(q.toLowerCase());
+            if (idx === -1) return m;
+            return [
+              m.slice(0, idx),
+              h("span", { className: "dsh-ho__fo-combo-hit", key: "hit" }, m.slice(idx, idx + q.length)),
+              m.slice(idx + q.length),
+            ];
+          }
           var effortOptions = ["", "max", "high", "medium", "low", "none"];
           function updateEntry(patch) {
             setFailoverList(failoverList.map(function (e) {
@@ -537,28 +556,52 @@ window.__ModuleLoader__.load({
                     value: model,
                     placeholder: t("failover.modelFollow"),
                     title: t("failover.model"),
-                    onChange: function (event) { updateEntry({ model: event.target.value }); },
+                    onFocus: function () { setActiveIndex(0); },
+                    onChange: function (event) {
+                      updateEntry({ model: event.target.value });
+                      setActiveIndex(0);
+                    },
+                    onKeyDown: function (event) {
+                      var k = event.key;
+                      var n = filtered.length;
+                      if (k === "ArrowDown" || (k === "w" && model === "")) {
+                        if (event.preventDefault) event.preventDefault();
+                        if (n > 0) setActiveIndex(Math.min(activeIndex + 1, n - 1));
+                      } else if (k === "ArrowUp" || (k === "s" && model === "")) {
+                        if (event.preventDefault) event.preventDefault();
+                        if (n > 0) setActiveIndex(Math.max(activeIndex - 1, 0));
+                      } else if (k === "Enter") {
+                        if (event.preventDefault) event.preventDefault();
+                        if (n > 0) {
+                          var pick = filtered[Math.min(Math.max(activeIndex, 0), n - 1)];
+                          updateEntry({ model: pick });
+                          if (event.target && event.target.blur) event.target.blur();
+                        }
+                      } else if (k === "Escape") {
+                        if (event.target && event.target.blur) event.target.blur();
+                      }
+                    },
                   }),
                   h("div", { className: "dsh-ho__fo-combo-list" },
-                    modelOptions
-                      .filter(function (m) {
-                        if (model === "") return true;
-                        return m.toLowerCase().indexOf(model.toLowerCase()) !== -1;
-                      })
-                      .map(function (m) {
-                        return h("div", {
-                          key: m,
-                          className: "dsh-ho__fo-combo-item" + (model === m ? " dsh-ho__fo-combo-item--on" : ""),
-                          onMouseDown: function (event) {
-                            // Pick on mousedown + prevent default: the shell may
-                            // blur the input (hiding the :focus-within popup) before
-                            // a click could fire — mousedown guarantees the pick lands.
-                            if (event && event.preventDefault) event.preventDefault();
-                            updateEntry({ model: m });
-                          },
-                          onClick: function () { updateEntry({ model: m }); },
-                        }, m);
-                      }),
+                    filtered.map(function (m, idx) {
+                      var cls = "dsh-ho__fo-combo-item";
+                      if (model === m) cls += " dsh-ho__fo-combo-item--on";
+                      if (activeIndex === idx) cls += " dsh-ho__fo-combo-item--active";
+                      return h("div", {
+                        key: m,
+                        className: cls,
+                        ref: function (el) { if (el && activeIndex === idx) el.scrollIntoView({ block: "nearest" }); },
+                        onMouseEnter: function () { setActiveIndex(idx); },
+                        onMouseDown: function (event) {
+                          // Pick on mousedown + prevent default: the shell may
+                          // blur the input (hiding the :focus-within popup) before
+                          // a click could fire — mousedown guarantees the pick lands.
+                          if (event && event.preventDefault) event.preventDefault();
+                          updateEntry({ model: m });
+                        },
+                        onClick: function () { updateEntry({ model: m }); },
+                      }, highlightMatch(m, model));
+                    }),
                   ),
                 ),
                 h("select", {

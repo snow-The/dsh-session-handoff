@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.6
+
+- **Combobox keyboard selection + match highlighting.** The typed text no
+  longer appears as a ghost item at the bottom of the suggestion list; the
+  matched substring inside each suggestion is highlighted instead. Focus/typing
+  selects the first suggestion; `↑`/`↓` move the highlight (and `w`/`s` when
+  the field is empty), `Enter` applies the highlighted suggestion and closes
+  the popup, `Esc` closes it. Hover follows the same highlight.
+
 ## v0.17.5
 
 - **Combobox items are now pickable.** The suggestion popup relies on the
