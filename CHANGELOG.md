@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.17.8
+
+- **Popup no longer overlaps the effort select.** The suggestion popup was
+  growing beyond the model input's width (content-sized `min-width`) and
+  covering the reasoning-effort select beside it. The popup is now locked to
+  the input's exact width; long model names truncate with an ellipsis and show
+  the full id on hover (title).
+
 ## v0.17.7
 
 - **Visible highlighting + Tab completion.** Highlight styles no longer depend
