@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.17.10
+
+- **Consistent field layout across rows.** The model/effort fields are now
+  stacked vertically in every failover row. Previously they sat side by side
+  when the row had room (no "set default" button) and wrapped to two lines
+  when it didn't — so rows looked different depending on the action buttons.
+  Vertical stacking makes every row identical at any panel width.
+
 ## v0.17.9
 
 - **Model and effort fields are now labeled.** Both fields showed "跟随当前"
