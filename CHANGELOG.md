@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.17.15
+
+- **Self-mount the compaction backend when the host plane lacks one.** The
+  patch-row re-enable does not survive the loader's row merge, so legacy web
+  sessions (no preset realm) still had no `ctx.compaction`. The plugin now
+  dynamically imports `@deepseek-ai/dsh-compaction-basic` and provides the
+  official `BasicCompactionEngine` on the host plane whenever nothing else
+  provides the service — acp_compress works in every session, old ones
+  included, while per-session realms keep their own backend.
+
 ## v0.17.14
 
 - **Explicitly clear `disabled` when re-enabling the host-plane compaction
