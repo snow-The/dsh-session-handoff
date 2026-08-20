@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.17.14
+
+- **Explicitly clear `disabled` when re-enabling the host-plane compaction
+  backend.** The loader merges patch rows per field, so re-stating the row
+  without `disabled` kept `dsh-web-app`'s `disabled: true`. The override now
+  sets `disabled: false`, which actually mounts compaction-basic on the host
+  plane for legacy sessions.
+
 ## v0.17.13
 
 - **Re-enable the host-plane compaction backend in web profiles.** `dsh-web-app`

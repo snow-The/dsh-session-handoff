@@ -17,3 +17,4 @@
 # their own backend; host visibility is the fallback.
 - id: compaction-basic
   name: '@deepseek-ai/dsh-compaction-basic'
+  disabled: false
