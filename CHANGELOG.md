@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.13
+
+- **Re-enable the host-plane compaction backend in web profiles.** `dsh-web-app`
+  disables the `compaction-basic` row on the host plane and mounts it only in
+  per-session preset realms, so sessions created before presets (or without a
+  realm) had no compaction backend at all. This bundle's patch now re-enables
+  the row by id (last write wins), giving every session — old ones included —
+  a working backend while per-session realms keep their own.
+
 ## v0.17.12
 
 - **acp_* tools now find the compaction service in web mode.** In web

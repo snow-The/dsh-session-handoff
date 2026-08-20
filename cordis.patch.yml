@@ -7,3 +7,13 @@
 - insert:
     - id: session-handoff
       name: 'dsh-session-handoff'
+
+# Web profiles disable compaction-basic on the host plane (dsh-web-app moves
+# it into per-session preset realms), so sessions created before the preset
+# mechanism — or any session without a realm — never get a compaction
+# backend and acp_compress always fails. Re-enable the row here: this patch
+# applies after dsh-web-app's and the loader's last-write-wins per row id
+# restores the host-plane backend for every session. Per-session realms keep
+# their own backend; host visibility is the fallback.
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
