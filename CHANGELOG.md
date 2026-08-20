@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.17.12
+
+- **acp_* tools now find the compaction service in web mode.** In web
+  profiles `dsh-web-app` disables `compaction-basic` on the host plane and
+  mounts it in each session's realm, so `ctx.get('compaction')` from a
+  host-plane plugin returned null and `acp_compress` always failed. The tools
+  now resolve the service from the agent's realm ctx first, then the session
+  ctx, then the host plane (headless mode), so old web sessions can compress
+  in place without migrating to a new session. `acp_status` reports which
+  plane the backend was found on.
+
 ## v0.17.11
 
 - **handoff_export no longer treats system banners as user objectives.**
