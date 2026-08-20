@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.17.11
+
+- **handoff_export no longer treats system banners as user objectives.**
+  Runtime-context snapshots, checkpoint condensations, skill-catalog notices,
+  and `<system-reminder>` injections arrive as `user/message` events in the
+  session log; they were captured verbatim into "Recent user objectives",
+  filling the handoff document with injected text instead of real user intent.
+  `summarizeEvents` now filters them out (and the `user messages` count
+  excludes them), so exported handoff docs carry actual conversation content.
+
 ## v0.17.10
 
 - **Consistent field layout across rows.** The model/effort fields are now
