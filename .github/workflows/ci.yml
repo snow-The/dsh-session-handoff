@@ -1,35 +1,52 @@
-name: CI
+name: build-and-test
+
 on:
   push:
     branches: [main, master]
   pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Configure GitHub Packages auth
+
+      - name: Setup GH Packages auth
         run: |
-          echo "@snow-the:registry=https://npm.pkg.github.com/" >> .npmrc
+          echo "@snow-the:registry=https://npm.pkg.github.com/" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
-      - run: pnpm install --no-frozen-lockfile --config.auto-install-peers=true
+
+      - name: Install
+        run: |
+          if [ ! -f package.json ]; then echo "no package.json, skipping"; exit 0; fi
+          pnpm install --no-frozen-lockfile --config.auto-install-peers=true
+
       - name: Build
         run: |
+          if [ ! -f package.json ]; then echo "no package.json, skipping"; exit 0; fi
           if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)" 2>/dev/null; then
             pnpm build
           else
             echo "no build script, skipping"
           fi
+
       - name: Test
         run: |
-          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)" 2>/dev/null; then
+          if [ ! -f package.json ]; then echo "no package.json, skipping"; exit 0; fi
+          if node -e "const s=require('./package.json').scripts?.test||''; process.exit(s && !s.includes('no test specified') ? 0 : 1)" 2>/dev/null; then
             pnpm test
           else
-            echo "no test script, skipping"
+            echo "no real test script, skipping"
           fi
