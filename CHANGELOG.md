@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.17.17
+
+- **Structured, type-aware compaction with recoverable pointers.** The ACP
+  summary rules now guide per-type compression (tool results -> name + input
+  signature + key numbers; code -> signatures + file:line; conversation ->
+  gist; images dropped), require a `## Recoverable` pointer line (paths /
+  functions / seq ids a later turn can re-read), and end with a one-line
+  self-check (`lost: none | ...`) so critical facts are folded back in
+  before the checkpoint lands.
+- **Hard-limit forecast in `acp_status`.** Using the measured per-turn
+  growth, status now reports the estimated turns until the hard limit
+  (e.g. `estimated: ~7 turns until hard limit`), so compression is
+  scheduled by rate, not just by percentage.
+
 ## v0.17.16
 
 - **Fix route key detection when keys live in `.credentials.yaml` refs.** The
