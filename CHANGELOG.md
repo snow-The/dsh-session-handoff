@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.17.19
+
+- **fix: web client registration id after the package rename.** The
+  `__ModuleLoader__.load({ id })` in `client/index.js` still used the legacy
+  short name `dsh-session-handoff`, so the host rejected the client bundle
+  (`loaded without registering "@snow-the/dsh-session-handoff"`). The id now
+  matches the package name. Server-side plugin name, locale namespace and
+  HTTP route prefix are unchanged, so existing `session-handoff:` settings
+  keep working.
+
 ## v0.17.18
 
 - **Recoverable pointers are archive-addressable.** The compaction rules now

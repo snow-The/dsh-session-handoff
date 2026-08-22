@@ -17,7 +17,7 @@
  * (settings.section slot, locale namespace, root-resolved services).
  */
 window.__ModuleLoader__.load({
-  id: "dsh-session-handoff",
+  id: "@snow-the/dsh-session-handoff",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -855,7 +855,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject("settings.section", function () {
         var disposeRegistration = ctx.slots.register({
           name: "settings.section",
-          id: "dsh-session-handoff",
+          id: "@snow-the/dsh-session-handoff",
           order: 60,
           label: function () { return tNav("nav"); },
           locale: NS,
