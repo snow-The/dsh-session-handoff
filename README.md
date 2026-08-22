@@ -1,4 +1,4 @@
-# dsh-session-handoff
+# @snow-the/dsh-session-handoff
 
 Session handoff & context management for DeepSeek Harness — built because the
 existing session-management and context-pruning plugins were written before

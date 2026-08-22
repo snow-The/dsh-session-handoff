@@ -1,5 +1,5 @@
 {
-  "name": "dsh-session-handoff",
+  "name": "@snow-the/dsh-session-handoff",
   "version": "0.17.16",
   "type": "module",
   "main": "./lib/index.js",

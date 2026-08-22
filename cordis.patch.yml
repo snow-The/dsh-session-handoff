@@ -6,7 +6,7 @@
 # enhancement. No client bundle in v0.1 (agent-driven workflow).
 - insert:
     - id: session-handoff
-      name: 'dsh-session-handoff'
+      name: '@snow-the/dsh-session-handoff'
 
 # Web profiles disable compaction-basic on the host plane (dsh-web-app moves
 # it into per-session preset realms), so sessions created before the preset
