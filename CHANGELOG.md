@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17.18
+
+- **Recoverable pointers are archive-addressable.** The compaction rules now
+  state explicitly that seq ids are event keys of the session archive
+  (`~/.dsh/sessions/**/session.jsonl.zstd`, grep `"seq":N`) and the keys
+  `acp_decompress` accepts — checkpoints keep exact seq ids so compressed
+  original detail can always be located in the existing local archive
+  without duplicating it into separate files.
+
 ## v0.17.17
 
 - **Structured, type-aware compaction with recoverable pointers.** The ACP
