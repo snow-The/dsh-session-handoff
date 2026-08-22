@@ -26,7 +26,7 @@ jobs:
       - name: Setup GH Packages auth
         run: |
           echo "@snow-the:registry=https://npm.pkg.github.com/" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_PAT }}" >> .npmrc
 
       - name: Install
         run: |
