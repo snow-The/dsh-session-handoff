@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.17.16
+
+- **Fix route key detection when keys live in `.credentials.yaml` refs.** The
+  `keyPrefix` fallback read the credentials document with a column-anchored
+  regex, so refs indented under `refs:` were never found and every route
+  showed `(missing)` even with a valid key. Detection now resolves the ref
+  line by name (any indentation; legacy top-level keys included), matching
+  the host's layered resolution (env wins, then the managed store) — the
+  Model Routes panel and `model_routes` now show the real key family.
+
 ## v0.17.15
 
 - **Self-mount the compaction backend when the host plane lacks one.** The
