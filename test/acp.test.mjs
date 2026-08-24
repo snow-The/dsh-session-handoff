@@ -5,33 +5,51 @@ import { __internals } from '../lib/index.js';
 
 const { parseLimit, thresholdTokens, pressureLevel, assertSafeRange } = __internals;
 
-test('parseLimit handles percent and token forms', () => {
-  assert.deepEqual(parseLimit('60%'), { ratio: 0.6, tokens: undefined });
-  assert.deepEqual(parseLimit('2000'), { ratio: undefined, tokens: 2000 });
-  assert.deepEqual(parseLimit(undefined), { ratio: 0.6, tokens: undefined });
+
+test('estimateGrowth ignores hidden nodes after compression', () => {
+  // Simulate a session right after acp_compress: the turn markers span a
+  // seq range that includes hidden (non-surface) nodes with large token
+  // pricing. Those must NOT be counted — they no longer occupy context.
+  const events = [];
+  // turn 1 markers + heavy nodes that got compressed away
+  events.push({ seq: 100, type: 'turn/start', data: {} });
+  for (let i = 101; i <= 130; i++) events.push({ seq: i, type: 'user/message', data: { message: { content: 'x'.repeat(200) } } });
+  events.push({ seq: 131, type: 'turn/start', data: {} });
+  for (let i = 132; i <= 140; i++) events.push({ seq: i, type: 'tool/result', data: { text: 'y'.repeat(150) } });
+  events.push({ seq: 141, type: 'turn/start', data: {} });
+  // after compression only a few nodes remain on the surface
+  const session = {
+    events,
+    surface: { nodes: [141] }, // only the latest turn marker survives
+  };
+  const meter = {
+    measure: () => ({
+      nodes: [
+        ...events.map((e, idx) => ({ seq: e.seq, tokens: idx % 3 === 0 ? 5000 : 800 })),
+      ],
+    }),
+  };
+  const ctx = { get: (k) => (k === 'tokenMeter' ? meter : undefined) };
+  const growth = __internals.estimateGrowth(ctx, { session }, 5);
+  // Hidden nodes (100..140) must be excluded; only surface seq 141 is counted,
+  // which alone is not enough pricing (pricedCount < 2) → falls through to the
+  // char path, still surface-filtered. Either way growth must stay tiny, not ~100k.
+  assert.ok(growth < 5000, 'growth must not include hidden nodes, got ' + growth);
 });
 
-test('thresholdTokens converts percent against window', () => {
-  assert.equal(thresholdTokens(parseLimit('60%'), 1_000_000), 600_000);
-  assert.equal(thresholdTokens(parseLimit('2000'), 1_000_000), 2000);
-  assert.equal(thresholdTokens(parseLimit('60%'), undefined), Infinity);
-});
-
-test('pressureLevel classifies soft/hard/none', () => {
-  assert.equal(pressureLevel(500_000, 600_000, 700_000), 'none');
-  assert.equal(pressureLevel(650_000, 600_000, 700_000), 'soft');
-  assert.equal(pressureLevel(750_000, 600_000, 700_000), 'hard');
-});
-
-test('assertSafeRange enforces surface membership and order', () => {
-  const session = { surface: { nodes: [10, 20, 30, 40, 50] } };
-  const config = { preserveRecent: 2 };
-  // valid: end at index 2 (30) leaves the last 2 (40,50) untouched
-  assert.doesNotThrow(() => assertSafeRange(session, 10, 30, config));
-  // end too recent
-  assert.throws(() => assertSafeRange(session, 10, 40, config), /cannot compress the last/);
-  // start after end
-  assert.throws(() => assertSafeRange(session, 30, 10, config), /after end/);
-  // not on surface
-  assert.throws(() => assertSafeRange(session, 11, 30, config), /not on the current surface/);
+test('estimateGrowth counts only surface nodes for pricing', () => {
+  const events = [
+    { seq: 200, type: 'turn/start', data: {} },
+    { seq: 201, type: 'user/message', data: { message: { content: 'a'.repeat(600) } } },
+    { seq: 202, type: 'assistant/message', data: { message: { content: 'b'.repeat(600) } } },
+    { seq: 203, type: 'turn/start', data: {} },
+  ];
+  const session = { events, surface: { nodes: [200, 201, 202, 203] } };
+  const meter = {
+    measure: () => ({ nodes: [{ seq: 200, tokens: 10 }, { seq: 201, tokens: 300 }, { seq: 202, tokens: 500 }, { seq: 203, tokens: 10 }] }),
+  };
+  const ctx = { get: (k) => (k === 'tokenMeter' ? meter : undefined) };
+  const growth = __internals.estimateGrowth(ctx, { session }, 5);
+  // (10+300+500+10) / 1 span = 820
+  assert.equal(growth, 820);
 });

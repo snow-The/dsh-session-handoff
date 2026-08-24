@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.17.20
+
+- **fix: ACP per-turn growth estimate inflates after compression.** The
+  estimator summed every node between the last few `turn/start` markers,
+  including seqs already hidden by acp_compress. Right after a compression the
+  hidden nodes (hundreds of thousands of tokens) were counted as if they had
+  just been added, producing absurd growth (`growth ≈ 612k/turn`) and a false
+  `~0 turns until hard limit` warning that pushed agents into premature
+  compression. The estimate now only counts nodes still on the current
+  surface; the char-based fallback is filtered the same way.
+
 ## v0.17.19
 
 - **fix: web client registration id after the package rename.** The
