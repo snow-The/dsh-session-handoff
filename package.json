@@ -47,5 +47,8 @@
     "type": "git",
     "url": "git+https://github.com/snow-The/dsh-session-handoff.git"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "node --import ./test/register-stubs.mjs --test \"test/*.test.mjs\""
+  }
 }
