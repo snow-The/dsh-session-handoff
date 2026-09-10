@@ -109,22 +109,34 @@ Because the algorithm lives in **notemap** (the relation layer), there is no new
 package: notemap's node-network view is derived data that can be rebuilt from the two
 stores at any time. If it is deleted, nothing is lost.
 
-## 5. Staged implementation (each stage is shippable and reversible)
+## 5. Staged implementation (S1-S3 landed 2026-09-11)
 
-1. **S1 - provenance tables + backfill.** Add the four tables; backfill `sources` from
-   every session file header found under `~/.dsh/sessions` (id, parent, kind, cwd) and
-   `mentions` from the existing `checkpoint_nodes` rows. Additive; existing queries
-   untouched. *Verify: row counts match today's nodes/checkpoints; no existing tool
-   changes behaviour.*
-2. **S2 - the shared algorithm + `graph_recall`.** Implement stages 1-9 in one module,
-   expose `graph_recall` (with provenance in the result) and `graph_agents` (the agent
-   tree with per-agent contribution counts). *Verify: a query that spans a main session
-   and its subagents returns hits annotated with both sources.*
-3. **S3 - notemap switches.** `notemap_*` read/write the shared store; delete
-   `importFromAcpGraph` and the private DB. *Verify: identical query results before and
-   after on a fixed corpus.*
-4. **S4 - canonicalisation + agent scope.** `aliases` written at ingest, a manual
-   `graph_merge` tool, and `agentScope` traversal in `recall`.
+1. **S1 - provenance tables + backfill.** DONE (`89e7124`). `sources` / `mentions` /
+   `aliases` / `delegations`, backfilled from the session headers (header-only read, so
+   144 sessions including a 155 MB one take milliseconds). Live numbers: 144 sources
+   (26 main / 118 subagent), 12,597 mentions, 4,388 aliases, 109 delegations.
+2. **S2 - the relation layer.** DONE (`dsh-notemap` `7837330`). `src/relations.ts`
+   (reciprocal rank fusion, consensus boost, beta-prior confidence, recency decay,
+   weighted BFS, PageRank - pure functions, 8/8 tests) and `src/network.ts` (read-only
+   over both stores). Verified: 196,352 edges imported, 109 delegation edges, 153
+   dangling edges dropped and counted.
+3. **S3 - close the loop.** DONE (`dsh-notemap` `a5deffc`, `dsh-acp-memory` `5026086`).
+   notemap publishes what 2+ contexts/agents independently agreed on as derived
+   `consensus` nodes (top 300, carrying sources / agent_kinds / mentions / score);
+   acp-memory reads those rows read-only and injects them - a consensus header on the
+   first turn, `[cross-agent]` lines when the user's text matches a digest subject.
+   Verified in a real harness process: the model answered "【跨会话/跨 agent 共识】
+   snow(3), users(3), dsh(3), json(3), build(3)" from its injected context.
+
+**Why the S3 read is not a cycle.** memory -> notemap is a read of DERIVED data: the
+digest can be deleted and rebuilt from the two authoritative stores at any time, no code
+is imported, and authority does not move (memory's seven layers stay the source of truth,
+handoff's graph stays the collected record). Where reads cross a layer boundary, they are
+data reads with a documented direction.
+
+**Known gap:** the digest is rebuilt when `notemap_network` runs. The aggregate itself
+only reads `sources` + `mentions` (no edge import), so it can be refreshed cheaply -
+automatic refresh is the obvious next step.
 
 ## 6. Open questions for the owner
 
