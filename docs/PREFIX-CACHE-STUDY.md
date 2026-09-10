@@ -82,9 +82,9 @@ system prompt 只在三种情况下**重新投影**成新的 `system/message`：
 
 | # | 改动 | 预期 | 验收指标 | 成本 |
 |---|---|---|---|---|
-| 1 | **压缩成本可见**：`acp_compress` 返回值里带上"本次压缩作废 N tokens 缓存 ≈ ¥X"（按 miss 价计） | 压缩从"免费操作"变成**有价格的决策**，避免为省 1k token 触发 200k 的 miss | 返回值含 `estimatedCacheLossTokens/Cost` | 小（半小时） |
+| 1 ✅ | **压缩成本可见**（已实现：`acp_compress` 追加 `prefix cache invalidated: ~N tokens (≈¥X)`）：`acp_compress` 返回值里带上"本次压缩作废 N tokens 缓存 ≈ ¥X"（按 miss 价计） | 压缩从"免费操作"变成**有价格的决策**，避免为省 1k token 触发 200k 的 miss | 返回值含 `estimatedCacheLossTokens/Cost` | 小（半小时） |
 | 2 | **压缩合并 + 时机**：优先"少而大"，且只在**系列边界**（轮末）压缩，不在轮中反复压 | 每会话压缩事件数 ↓ → 全量 miss 次数 ↓ | 每会话 `acp_compress` 次数、长会话命中率 69.8% → ≥95% | 小～中 |
-| 3 | **逐会话/逐系列缓存指标**：把 `cacheRead/(cacheRead+uncached)` 显示在 `acp_status`（账本已有数据 ✓） | 让这类回归**可见**（现在的 98% 是"看账本才知道"） | `acp_status` 输出含本会话命中率 | 小 |
+| 3 ✅ | **逐会话缓存指标**（已实现：`acp_status` 输出来自 `lib/cache-stats.js`；实测本会话 98.5% 命中、miss 占 13% prompt 成本）：把 `cacheRead/(cacheRead+uncached)` 显示在 `acp_status`（账本已有数据 ✓） | 让这类回归**可见**（现在的 98% 是"看账本才知道"） | `acp_status` 输出含本会话命中率 | 小 |
 | 4 | **turn-end 工具结果收缩**（借 Reasonix Pillar 3）：轮末把 >3k token 的工具结果压到 3k，而不是靠整表压缩 | **降低压缩事件数**（正文变小 → 更晚触发阈值） | 每会话压缩次数 ↓ | 中 |
 | 5 | **storm 抑制**：滑窗内相同 `(tool,args)` 抑制 + 注入反思 | 省 token（今天我自己就重复跑过同样的 grep ✗） | 重复调用计数 | 中 |
 | 6 | ~~banner 冻结~~ | 低价值 ✗（系列内已冻结） | — | — |
@@ -107,3 +107,20 @@ system prompt 只在三种情况下**重新投影**成新的 `system/message`：
 - 它的 `turn-end` 收缩本身也是"重写"✗，只是把重写**集中到轮末一次**（一次 miss 而不是多次）——这一点值得学，但别以为它不需要付缓存代价。
 - 我们的 3,988 次调用统计里，**同一轮内的重复发送**占了绝大多数缓存读 —— 单看合计命中率会**高估**健康度 ✗（要按会话长度分层看）。
 - `deepseek-v4-flash-fast` 那个 27% 的离群点提示：**换模型 = 换缓存域**（不同模型缓存不互通），频繁切换模型会持续冷启动 ✗。
+
+
+---
+
+## 附：已实现（2026-09-11，commit 见仓库历史）
+
+`lib/cache-stats.js`（新）+ `lib/index.js` 两处接线：
+
+| API | 作用 | 实测输出（真实账本） |
+|---|---|---|
+| `readSessionCache(sessionId)` | 只读宿主按会话的 usage 行；**无数据返回 null，绝不返回假 0** | `{hits: 3513708672, misses: 52516278, hitRate: 0.9853}` |
+| `formatCacheLine(stats)` | 一行状态 | `prefix cache: 98.5% hit (3.5B cached / 52.5M miss) — misses are 13.0% of prompt cost` |
+| `compactionCacheLoss(promptTokens, price)` | 压缩的缓存代价 = 整个 prompt × (miss − hit) 价格 | `{tokens: 200000, costCNY: 0.18}` |
+
+- 配置：`session-handoff.cacheMissPricePerMTokens`（默认 1，仅用于把 token 换算成钱）
+- 测试：`test/cache.test.mjs` 7 项（含"截断的存储必须降级为 null 而不是抛异常/假 0"）→ 全套 **53/53**
+- 生效时机：**下次 DSH 启动**（插件在启动时载入）
