@@ -49,6 +49,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "node --import ./test/register-stubs.mjs --test \"test/*.test.mjs\""
+    "test": "node --import ./test/register-stubs.mjs --test \"test/*.test.mjs\"",
+    "fuzz": "node test/fuzz-reader.mjs --iters=400"
   }
 }
