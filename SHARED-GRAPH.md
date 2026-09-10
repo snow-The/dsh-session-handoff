@@ -67,19 +67,47 @@ Notes that keep it honest:
   separators, plurals) and can be corrected by hand; no fuzzy merging that silently
   fuses two different things.
 
-## 4. Who owns what afterwards
+## 4. Who owns what (decided 2026-09-11)
+
+The owner's decision: **notemap depends on BOTH handoff and memory.**
+
+```
+handoff  (dsh-session-handoff)  ->  COLLECT + ORGANIZE
+    session logs -> checkpoints -> entities -> the authoritative graph,
+    plus provenance (sources / mentions / aliases / delegations)
+
+memory   (dsh-acp-memory)       ->  PROCESS + USE
+    seven layers: capture on turn/end, recall + inject per turn,
+    distillation; the "what did I learn" axis
+
+notemap  (dsh-notemap)          ->  RELATE
+    turns their LINEAR structures (a checkpoint sequence, a list of layers, a session
+    timeline) into a NODE NETWORK: typed nodes, weighted/confidence-scored edges,
+    and the relation algorithms (paths, centrality, PageRank, communities, fusion).
+```
 
 | component | owner | consumers |
 |---|---|---|
-| the store + schema + ingest (`sources`/`mentions`/`aliases`/`delegations`) | dsh-session-handoff | everything |
-| the relation algorithm (stages 1-9) | extracted into a small pure module, no DSH dependency | session-handoff tools + notemap |
-| `notemap_*` note tools (`add/link/neighbors/paths/…`) | dsh-notemap | keep as-is, but they write into the **shared** store |
-| `acp_*` memory tools | dsh-session-handoff | unchanged |
+| session ingest, checkpoints, entity extraction, provenance tables | **handoff** | everyone (it is the only writer) |
+| seven-layer memory, capture / recall / inject | **memory** | notemap reads the layers; agents use the tools |
+| node-network materialisation + relation algorithms + fusion ranking | **notemap** | its own tools; handoff keeps only simple lookups |
+| `acp_*` memory tools | handoff | unchanged |
+| `memory_*` tools | memory | unchanged |
+| `notemap_*` tools | notemap | unchanged surface, now backed by the shared store |
 
-notemap stops importing a copy and becomes a **writer/reader of the shared graph** with
-its relation tooling on top. Its canvas UI is already gone (0.12.0); the plugin's value
-is now the algorithms, which move to the shared module instead of living in a private
-copy of the data.
+Dependency direction (acyclic, verified in the code today - all three declare **zero**
+package dependencies on each other and couple only through SQLite files):
+
+```
+notemap ──depends on──▶ handoff   (read: graph.db + provenance)
+   └────depends on──▶ memory      (read: memory.db layers)
+memory  ──reads────▶ handoff      (read-only: graph.db, already the case)
+handoff ──owns────▶ sessions/ + graph.db
+```
+
+Because the algorithm lives in **notemap** (the relation layer), there is no new shared
+package: notemap's node-network view is derived data that can be rebuilt from the two
+stores at any time. If it is deleted, nothing is lost.
 
 ## 5. Staged implementation (each stage is shippable and reversible)
 
