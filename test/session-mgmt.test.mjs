@@ -85,3 +85,56 @@ test('session_purge removes the entry', async () => {
 test('cleanup', () => {
   rmSync(tmp, { recursive: true, force: true });
 });
+
+// --- regression: the persistence list returns SNAPSHOTS, not headers -----------
+// Production symptom (rc.2, 2026-09-12): session_list printed "undefined" for every
+// row and session_trash answered "(no artifact found, entry recorded)" for sessions
+// that plainly existed. Both read `h.id` one level too shallow.
+const { sessionEntries, registerSessionMgmtTools } = mod;
+
+test('persistence snapshots are unwrapped', () => {
+  const snapshots = [{ header: { id: 'session-abc', cwd: 'C:\\work' }, revision: 'r1', sizeBytes: 10 }];
+  const entries = sessionEntries(snapshots);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].id, 'session-abc');
+  assert.equal(entries[0].cwd, 'C:\\work');
+  assert.equal(entries[0].entry, snapshots[0], 'the raw snapshot must survive for locate()');
+});
+
+test('bare headers still work; identity-less rows are dropped, never rendered', () => {
+  assert.equal(sessionEntries([{ id: 'x', cwd: '/a' }])[0].id, 'x');
+  assert.deepEqual(sessionEntries([{ revision: 'r' }, null, undefined, { header: {} }]), []);
+  assert.deepEqual(sessionEntries(null), []);
+  assert.deepEqual(sessionEntries(undefined), []);
+});
+
+test('session_list renders real ids and never the word undefined', async () => {
+  const registered = [];
+  const ctx = {
+    tools: { register: (t) => registered.push(t) },
+    sessionPersistence: {
+      list: async () => [{ header: { id: 'session-xyz', cwd: 'D:\\proj' }, revision: 'r', sizeBytes: 1 }],
+    },
+    agents: { get: () => undefined },
+  };
+  registerSessionMgmtTools(ctx);
+  const tool = registered.find((t) => t.name === 'session_list');
+  assert.ok(tool, 'session_list must register');
+  const printed = await tool.execute({});
+  assert.match(printed, /session-xyz/);
+  assert.match(printed, /D:\\proj/);
+  assert.ok(!/undefined/.test(printed), 'no row may render as undefined: ' + printed);
+});
+
+test('session_list tolerates the old bare-header shape too', async () => {
+  const registered = [];
+  const ctx = {
+    tools: { register: (t) => registered.push(t) },
+    sessionPersistence: { list: async () => [{ id: 'session-old', cwd: '/legacy' }] },
+    agents: { get: () => undefined },
+  };
+  registerSessionMgmtTools(ctx);
+  const printed = await registered.find((t) => t.name === 'session_list').execute({});
+  assert.match(printed, /session-old/);
+  assert.ok(!/undefined/.test(printed));
+});
