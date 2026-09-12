@@ -1,5 +1,6 @@
 // Unit tests for the active-context-pruning internals: pressure math & range safety.
 import { test } from 'node:test';
+import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { __internals } from '../lib/index.js';
 
@@ -95,4 +96,24 @@ test('a missing ratio falls back to 35 percent', () => {
   const withDefault = deepFoldStart(meterFor(nodes), session, {}, 9, 10, 100000);
   const explicit = deepFoldStart(meterFor(nodes), session, { compressTargetRatio: 0.35 }, 9, 10, 100000);
   assert.equal(withDefault, explicit);
+});
+
+// --- structural guard: tool parameter schemas ----------------------------------
+// The host's schema compiler REJECTS the mere presence of `required: false`
+// ("parameters.X.required must be true when present") and then the whole plugin tree
+// fails to load — DSH cannot boot at all. Optional parameters must simply omit the key.
+// This shipped once (acp_compress.start) and took the harness down; the test below fails
+// if it ever comes back. Comments are stripped so an explanatory comment cannot trip it.
+test('no tool parameter declares required:false (the host rejects the key outright)', () => {
+  const dir = new URL('../lib/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
+  const offenders = [];
+  for (const f of files) {
+    const raw = readFileSync(new URL(f, dir), 'utf8');
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    code.split('\n').forEach((line, i) => {
+      if (/\brequired\s*:\s*false\b/.test(line)) offenders.push(f + ':' + (i + 1) + ' ' + line.trim().slice(0, 90));
+    });
+  }
+  assert.deepEqual(offenders, [], 'required:false kills the plugin tree at load');
 });
