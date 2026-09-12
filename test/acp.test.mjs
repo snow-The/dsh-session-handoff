@@ -117,3 +117,30 @@ test('no tool parameter declares required:false (the host rejects the key outrig
   }
   assert.deepEqual(offenders, [], 'required:false kills the plugin tree at load');
 });
+
+// --- banner/status wording: percentages must never read as "context full" ----------
+// Production complaint: "只到730K就说到100%" — the soft limit (730k) was rendered as a bare
+// percentage, so a context at the limit read as a full window even though the window is 1M.
+import { renderStatus } from '../lib/index.js';
+
+const stub = (usedTokens) => ({
+  ctx: { get: (name) => (name === 'tokenMeter' ? { measure: () => ({ totalTokens: usedTokens, nodes: [] }) } : undefined) },
+  agent: { session: { id: 's', surface: { nodes: [] } } },
+});
+
+test('the quiet line reports fullness against the WINDOW, and the soft limit as a threshold', () => {
+  const { ctx, agent } = stub(730000);
+  const line = renderStatus(ctx, agent, {}, 1000000, undefined, { quiet: true });
+  assert.match(line, /73% of window/, 'window percentage first: ' + line);
+  // the resolved soft limit depends on config (default 60% of 1M) — assert it is NAMED as a
+  // threshold with its own number, not that it equals a particular value
+  assert.match(line, /soft limit \d+ = \d+%/, 'soft limit named as a threshold: ' + line);
+  assert.ok(!/\(100%\)/.test(line), 'a bare 100% must never appear: ' + line);
+});
+
+test('an unknown window degrades to the threshold alone, never a fake percentage', () => {
+  const { ctx, agent } = stub(130000);
+  const line = renderStatus(ctx, agent, {}, undefined, undefined, { quiet: true });
+  assert.ok(!/% of window/.test(line), 'no window -> no window percentage: ' + line);
+  assert.match(line, /tokens/);
+});
