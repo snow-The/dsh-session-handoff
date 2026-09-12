@@ -134,8 +134,10 @@ test('the quiet line reports fullness against the WINDOW, and the soft limit as 
   assert.match(line, /73% of window/, 'window percentage first: ' + line);
   // the resolved soft limit depends on config (default 60% of 1M) — assert it is NAMED as a
   // threshold with its own number, not that it equals a particular value
-  assert.match(line, /soft limit \d+ = \d+%/, 'soft limit named as a threshold: ' + line);
+  assert.match(line, /\d+k below soft limit \d+/, 'headroom, not a bare ratio: ' + line);
   assert.ok(!/\(100%\)/.test(line), 'a bare 100% must never appear: ' + line);
+  assert.ok(!/soft limit \d+ = \d+%/.test(line), 'the threshold must never be stated as a ratio: ' + line);
+  assert.ok(!/= \d+%/.test(line), 'no bare threshold ratio anywhere: ' + line);
 });
 
 test('an unknown window degrades to the threshold alone, never a fake percentage', () => {
