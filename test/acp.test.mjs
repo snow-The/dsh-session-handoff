@@ -211,3 +211,44 @@ test('a fold that does not shrink the context is a failure, never a no-op', () =
   assert.match(foldShrank(900000, 899000).reason, /only \d+ tokens freed/);
   assert.equal(foldShrank(NaN, 5).ok, false, 'unmeasurable is a failure, not a pass');
 });
+
+test('a host fold never starts at surface node 0 (the system prompt)', () => {
+  // Live evidence (2026-09-13): the host trigger DID fire, and the fold it requested was refused
+  // with "surface replace: node 0 holds the system prompt and may be rewritten only by a
+  // system/message over exactly that node" -- so compaction "ran" and nothing shrank. The trigger
+  // looked dead while it was in fact firing and failing on its range.
+  const { hostFoldRange } = __internals;
+  const nodes = [901, 902, 903, 904, 905, 906];
+  assert.deepEqual(hostFoldRange(nodes, 2), { start: 902, end: 'auto' });
+  assert.notEqual(hostFoldRange(nodes, 2).start, nodes[0], 'nodes[0] is the system prompt and is not ours to rewrite');
+  assert.equal(hostFoldRange([901, 902, 903, 904], 2), null, 'system + start + 2 preserved = no end node exists');
+  assert.equal(hostFoldRange([901, 902, 903, 904, 905], 2).start, 902, 'one foldable end node is enough');
+  assert.equal(hostFoldRange(null, 2), null, 'a session without a surface must not throw');
+  assert.equal(hostFoldRange([1, 2, 3, 4, 5], NaN).start, 2, 'an unparsed preserveRecent falls back to 2');
+  assert.equal(hostFoldRange(undefined, 3), null, 'a deeper preserved tail simply needs more nodes');
+});
+
+test('a recorded fold failure stops nagging once the pressure is gone', () => {
+  const { foldFailureStale } = __internals;
+  const note = { at: Date.now(), before: null, after: null, reason: 'surface replace: node 0 …' };
+  assert.equal(foldFailureStale(note, 900000, 780000), false, 'still over the soft limit: the note is current');
+  assert.equal(foldFailureStale(note, 89608, 780000), true, 'folded by someone else: the note is stale');
+  assert.equal(foldFailureStale(note, 500, Infinity), true, 'no measurable pressure means nothing to nag about');
+  assert.equal(foldFailureStale(note, NaN, 780000), false, 'unmeasurable usage must not erase a real failure');
+  assert.equal(foldFailureStale(null, 89608, 780000), false, 'nothing recorded, nothing to clear');
+});
+
+test('the acp_compress schema admits the end value the banner orders the model to send', () => {
+  // Live evidence (2026-09-13): the banner says 'Call acp_compress end:auto now' and the declared
+  // schema took an integer only, so following the plugin's own instruction failed with
+  // 'invalid arguments: end must be an integer' — at the fuse, where the model then had to
+  // hand-derive the pairing-balanced range that runCompaction already derives for auto.
+  const { ACP_COMPRESS_PARAMETERS: params } = __internals;
+  assert.equal(params.end.required, true, 'end is mandatory');
+  assert.notEqual(params.end.required, false, 'required:false fails the whole plugin tree at load');
+  assert.equal(params.end.type, undefined, 'the host rejects a type key beside oneOf');
+  const branches = params.end.oneOf.map((b) => b.type);
+  assert.ok(branches.length >= 2, 'the host compiler rejects oneOf with fewer than two branches');
+  assert.ok(branches.includes('integer'), 'a plain last seq must keep working');
+  assert.ok(branches.includes('string'), 'the banner says end:auto, so auto must be expressible');
+});
