@@ -65,6 +65,23 @@ test('round-trip: set then read persists', async () => {
   assert.equal(cfg.maxContextLimit, '80%');
 });
 
+// The inconsistency this test exists for: the UI slider capped at 90 while the TOOL accepted up to
+// 95, so settings.yaml (88/95) described a configuration the panel could not even display. The more
+// permissive writer won. One ceiling, checked from both ends.
+test('the fuse ceiling is one number: the tool refuses what the UI cannot display', async () => {
+  assert.equal(mod.FUSE_CEILING_PCT, 90);
+  const ui = readFileSync(new URL('../client/index.js', import.meta.url), 'utf8');
+  assert.ok(ui.includes('max: 90,'), 'the UI slider must still cap at the same number');
+  assert.ok(ui.includes('Math.min(90,'), 'and clamp a stored value to it');
+  assert.throws(() => validateLimit('95%', 'maxContextLimit'), /must be 1-90/, 'the fuse may not exceed the ceiling');
+  assert.equal(validateLimit('90%', 'maxContextLimit'), '90%', 'the ceiling itself is allowed');
+  assert.equal(validateLimit('95%', 'minContextLimit'), '95%', 'the advisory threshold has no burst-margin constraint');
+  const tools = [];
+  mod.registerAcpConfigTools({ tools: { register: (t) => tools.push(t) } });
+  const set = tools.find((t) => t.name === 'acp_set_limit');
+  await assert.rejects(() => set.execute({ maxContextLimit: '95%' }, {}), /must be 1-90/);
+});
+
 test('cleanup', () => {
   rmSync(tmp, { recursive: true, force: true });
 });
