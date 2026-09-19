@@ -19,6 +19,10 @@
   - L4 is the layer we do not have. Proxies: the gap between the last two folds, and the retrieval
     signals dsh-notemap records. "restatement of the same request by the user" prints as NOT
     MEASURED — an absent signal must not read as a zero.
+  - the retrieval line counts a third category — a resolver answer that came back unresolved — so
+    the two plugins share ONE file contract, and it is checked by booting the DEPLOYED profile
+    copies (22 checks) rather than the source tree: the first run of that check found the
+    unresolved-resolve gap above, and a stale hard-linked `index.js` in the profile
 - test: `test/metrics.test.mjs` (7: ledger labels, torn-line tolerance, an unwritable journal is a
   `false` and not a throw, rotation, pooled-vs-per-session disagreement, layer gaps, retrieval
   journal) plus `test/metrics-status.test.mjs` (3: boots `apply()` and asserts the text a user
