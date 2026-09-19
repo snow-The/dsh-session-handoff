@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.18.0
+
+- feat(status): `acp_status` prints the budget ledger (nominal ratio + ABSOLUTE cap + UNIT on one
+  line), the four layers of 31057 Tab.4, and the pooled view beside this session.
+  - `lib/metrics.js`: an append-only journal (`<DSH_HOME>/acp-metrics.jsonl`) written by every fold
+    with `{ts, session, range, nodes, before, after, lossTokens, lossCostCNY, ms, userMsgs}`. The
+    per-session ledger was an in-process Map, so every number died with the process and a POOLED
+    figure could not be computed at all — while pooled and per-session must both be visible (31057
+    reports pooled 55.5% vs per-session 50.8% for the same data; either alone would be "the" number).
+  - `after` is RE-MEASURED after the fold, so a fold that shrinks less than it promised is visible;
+    `before` was already measured.
+  - the status line states its scope: journal count vs in-process count. They disagreed the first
+    time the new test ran, and a restart resets only one of them.
+  - an unknown window prints `window UNKNOWN` with its REASON (`no-llm-service` /
+    `no-provider-model` / `no-context-window`) and never a percentage: a ratio without a
+    denominator is a label, not a measurement.
+  - L4 is the layer we do not have. Proxies: the gap between the last two folds, and the retrieval
+    signals dsh-notemap records. "restatement of the same request by the user" prints as NOT
+    MEASURED — an absent signal must not read as a zero.
+- test: `test/metrics.test.mjs` (7: ledger labels, torn-line tolerance, an unwritable journal is a
+  `false` and not a throw, rotation, pooled-vs-per-session disagreement, layer gaps, retrieval
+  journal) plus `test/metrics-status.test.mjs` (3: boots `apply()` and asserts the text a user
+  actually reads, including the UNKNOWN-window case). 83/83.
+
 ## v0.17.20
 
 - **fix: ACP per-turn growth estimate inflates after compression.** The
