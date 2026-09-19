@@ -23,6 +23,13 @@
     the two plugins share ONE file contract, and it is checked by booting the DEPLOYED profile
     copies (22 checks) rather than the source tree: the first run of that check found the
     unresolved-resolve gap above, and a stale hard-linked `index.js` in the profile
+- fix(lifecycle): `dispose()` terminates the ingest worker. The worker is `unref()`'d so it never holds
+  the HARNESS open, but its MessagePort is still an active handle: any short-lived embedding (a test
+  process, a CLI) that triggered one fold hung at exit with `["PipeWrap","PipeWrap","MessagePort"]` and
+  no failing test to show for it. Unload/teardown now calls `dispose()`.
+- test: the automatic fold is covered end-to-end — `agent/pre-step` with a stubbed compaction service
+  must fold `[2, 8]` (index 0 is the system-prompt node and is never folded) with nobody deciding, and
+  a fold that fails to shrink must be reported and cooled down instead of retried every step.
 - test: `test/metrics.test.mjs` (7: ledger labels, torn-line tolerance, an unwritable journal is a
   `false` and not a throw, rotation, pooled-vs-per-session disagreement, layer gaps, retrieval
   journal) plus `test/metrics-status.test.mjs` (3: boots `apply()` and asserts the text a user
