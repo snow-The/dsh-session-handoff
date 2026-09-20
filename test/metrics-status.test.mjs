@@ -65,7 +65,7 @@ test('acp_status prints the budget ledger, the four layers and the pooled view',
     'ratio, absolute cap and unit in one line: ' + text.split('\n')[1]);
   assert.match(text, /L1 stored: 1234 tok on the surface \/ 3 nodes \/ 0 collapsed/);
   assert.match(text, /L2 delivered \(billed\): not recorded for this session yet/);
-  assert.match(text, /L3 work: 2 compaction\(s\), ~11000 tok lost to prefix-cache misses, ≈0\.900 CNY, 500 ms in folds, 7 user turns so far/);
+  assert.match(text, /L3 work: 2 compaction\(s\), ~11000 tok lost to prefix-cache misses, ≈0\.900 CNY, 500 ms of plugin-side fold calls, 7 user turns so far/);
   assert.match(text, /L4 outcome \(proxy\): gap between the last two folds 3\.0s/);
   assert.match(text, /retrieval signals: 2 degenerate answer\(s\) — 1 truncated, 1 unknown_id, 0 unresolved/);
   assert.match(text, /restatement of the same request by the user: NOT measured/);
@@ -132,19 +132,28 @@ function bootAutoFold({ shrink = true } = {}) {
     on: (evt, fn) => { handlers.set(evt, fn); },
   };
   apply(ctx, { minContextLimit: '78%', maxContextLimit: '90%' });
+  // A real harness session has NO `events` property (ownEvents/snapshotEvents are the accessors) -
+  // so this stub deliberately exposes only the accessor. Reading `.events` is exactly the bug that
+  // made the user count always 0 and the lossless block store always empty.
+  const events = [];
+  events.push({ seq: 1, type: 'user/message', data: { message: { content: 'first ask' } } });
+  events.push({ seq: 2, type: 'assistant/message', data: { message: { content: 'working' } } });
+  events.push({ seq: 3, type: 'user/message', data: { message: { content: 'second ask' } } });
+  events.push({ seq: 4, type: 'tool/result', data: { name: 'pwsh', text: 'z'.repeat(300) } });
+  events.push({ seq: 5, type: 'user/message', data: { message: { content: 'third ask' } } });
   const session = {
     id: 'auto-fold-' + (shrink ? 'ok' : 'stuck'),
     surface: { nodes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
-    events: [],
+    ownEvents: () => events,
     requestHeader: () => ({ config: { provider: 'deepseek', model: 'probe' } }),
     ctx,
   };
-  return { agent: { session, ctx, options: {} }, handlers, logs, foldedCalls, session };
+  return { agent: { session, ctx, options: {} }, handlers, logs, foldedCalls, session, registered };
 }
 
 test('the host folds by itself at the fuse — no model call, no user, no asking', async () => {
   const before = readMetrics().rows.length;
-  const { agent, handlers, logs, foldedCalls } = bootAutoFold();
+  const { agent, handlers, logs, foldedCalls, registered } = bootAutoFold();
   const preStep = handlers.get('agent/pre-step');
   assert.equal(typeof preStep, 'function', 'the automatic fold must hang off agent/pre-step');
   let nextCalled = false;
@@ -156,8 +165,16 @@ test('the host folds by itself at the fuse — no model call, no user, no asking
   assert.ok(logs.some((l) => /acp host-trigger: folded 950000 -> 300000/.test(l)), "the fold is logged: " + logs.join(" | "));
   const rows = readMetrics().rows;
   assert.equal(rows.length, before + 1, "the automatic fold leaves a journal row like any other fold");
-  assert.equal(rows[rows.length - 1].before, 950000);
-  assert.equal(rows[rows.length - 1].after, 300000);
+  const row = rows[rows.length - 1];
+  assert.equal(row.before, 950000);
+  assert.equal(row.after, 300000);
+  assert.equal(row.userMsgs, 3, "L4's context is a REAL count - it read a property the host does not have and was always 0");
+
+  // The lossless block store: a 300-char tool result sat inside the folded range, so it must be
+  // recoverable. This path was a no-op for the same reason (`session.events`) and reported
+  // "blocks saved: 0" - a number that reads like "nothing was worth keeping".
+  const stats = await registered.find((t) => t.name === 'acp_block').execute({ command: 'stats' }, {});
+  assert.match(String(stats), /blocks=[1-9]/, "the folded tool output must really be in the block store: " + String(stats));
 });
 
 test('a fold that does not shrink is reported and cooled down, not retried in a loop', async () => {

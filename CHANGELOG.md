@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.18.1
+
+- fix(metrics): the first REAL journal row showed two fields that were not measurements.
+  - `userMsgs` read `agent.session.events` - a property a harness session does not have (this module
+    documents that fact a few lines above the helper). L4's "user turns so far" was therefore ALWAYS 0,
+    and the first real row proved it: `userMsgs: 0` for a session with 810k tokens of history. It now
+    goes through the same `sessionEvents()` accessor as everything else.
+  - the lossless block store (`storeCompressedBlocks`) had the same bug AND looked events up by ARRAY
+    POSITION when the ids it holds are seqs. It stored nothing and reported "blocks saved: 0" - a
+    number that reads like "the folded range held nothing worth keeping". Events are now indexed by seq.
+  - `ms` is now labelled for what it actually measures: the plugin-side call, not the summarizer's
+    work. The first real row says 9ms for a 536k-token fold because the host produces the summary
+    outside that await, so it must not be read as the fold's wall-clock cost.
+- note(the first production fold, for the record): another session folded by itself at 810,420 tokens,
+  seq 8-3070, 886 nodes, down to 273,596 (-66.2%), prefix-cache loss ~0.729 CNY. The pooled line read
+  "1 compaction(s) across 1 session(s)" while this session showed 0 - which is exactly why pooled and
+  per-session are printed side by side.
+- test: the automatic-fold case now runs against a session stub that exposes ONLY the accessor
+  (`ownEvents()`, no `events`), asserts `userMsgs` is the real count, and asserts the folded tool output
+  is actually in the block store (`acp_block stats` -> blocks=1). Mutation-checked: restoring either
+  `.events` read turns it red. 85/85.
+
 ## v0.18.0
 
 - feat(status): `acp_status` prints the budget ledger (nominal ratio + ABSOLUTE cap + UNIT on one
