@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.18.2
+
+- fix(graph): `acp_graph build` carried the SAME `session.events` bug as the two metric fields, in its
+  own copy of the read. Its fallback — documented as covering "non-zstd / plaintext sessions" — read a
+  property a harness session does not have, and the ternary had the same expression in both branches.
+  The fallback could never run, so `build` reported "+0 checkpoint(s)" whenever the session file held no
+  events: a number that reads exactly like "this session had none".
+- refactor(session-events): the accessor now has ONE owner, `lib/session-events.js`, imported by both
+  index.js and graph.js. Two owners is how the second, broken reader came to exist at all: index.js held
+  the correct helper with a comment explaining the missing property, while graph.js — a separate module
+  that could not see it — read the property directly.
+- test: `test/graph-build.test.mjs` boots the plugin and builds from a session stub that exposes ONLY
+  `ownEvents()`; restoring the `.events` read turns it red. 86/86.
+
 ## v0.18.1
 
 - fix(metrics): the first REAL journal row showed two fields that were not measurements.
