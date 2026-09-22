@@ -223,9 +223,18 @@ test('an end that would split a step is retried at the balanced boundary, never 
     effect: () => {}, provide: () => {}, on: () => {},
   };
   apply(ctx, { minContextLimit: '78%', maxContextLimit: '90%' });
+  // Nodes 3/4 are one complete step (call c1, result c1); node 5 opens c2, so a cut right after node 5
+  // would split that step — exactly what the core refuses.
+  const events = [
+    { seq: 2, type: 'user/message', data: { message: { content: [{ type: 'text', text: 'ask' }] } } },
+    { seq: 3, type: 'assistant/message', data: { message: { content: [{ type: 'tool-call', id: 'c1', name: 'run_code' }] } } },
+    { seq: 4, type: 'tool/result', data: { message: { content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'out' }] }] } } },
+    { seq: 5, type: 'assistant/message', data: { message: { content: [{ type: 'tool-call', id: 'c2', name: 'run_code' }] } } },
+    { seq: 6, type: 'tool/result', data: { message: { content: [{ type: 'tool-result', toolCallId: 'c2', content: [{ type: 'text', text: 'out' }] }] } } },
+  ];
   const session = {
     id: 'snap-retry', surface: { nodes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
-    ownEvents: () => [], requestHeader: () => ({ config: { provider: 'deepseek', model: 'probe' } }), ctx,
+    ownEvents: () => events, requestHeader: () => ({ config: { provider: 'deepseek', model: 'probe' } }), ctx,
   };
   const agent = { session, ctx, options: {} };
   const tool = registered.find((t) => t.name === 'acp_compress');
@@ -233,6 +242,7 @@ test('an end that would split a step is retried at the balanced boundary, never 
   assert.equal(calls.length, 2, 'refused once, retried once: ' + JSON.stringify(calls));
   assert.deepEqual(calls[0], [2, 5], 'the first attempt used exactly what the caller asked for');
   assert.equal(calls[1][0], 2, 'the start is untouched');
-  assert.notEqual(calls[1][1], 5, 'the retry moved the END to the balanced boundary');
-  assert.match(String(out), /split a step: folded to the balanced boundary \d+ instead/, 'and the caller is told what happened: ' + out);
+  assert.equal(calls[1][1], 4, 'the retry snapped DOWN to the last balanced cut (node 4 closes c1); node 5 opens c2');
+  assert.ok(calls[1][1] < 5, 'a retry is a SUBSET of what the caller asked for, never a bigger fold');
+  assert.match(String(out), /split a step: folded DOWN to the balanced boundary 4 instead/, 'and the caller is told what happened: ' + out);
 });

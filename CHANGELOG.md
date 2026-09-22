@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.18.8
+
+- fix(compress): the v0.18.7 retry moved a refused `end` to the boundary `end: 'auto'` picks — the one
+  nearest the preserved TAIL — so a caller asking for a SMALL range could have had far more folded than
+  it asked for. The note in that release ("can only ever fold LESS") was wrong about its own code. The
+  retry now snaps DOWN: `lib/pairing.js` replicates the core rule ("no unanswered tool call crosses the
+  cut", the same predicate `dsh-compaction` enforces) and picks the nearest balanced cut at or BEFORE
+  the requested end, so the fold is always a SUBSET of the request. Nothing balanced inside the range
+  means the original refusal stands — the plugin never invents a range.
+- note(measured, shrink): with `shrinkWindowNodes: 16` + `shrinkProtectedTail: 4` the deterministic
+  shrink is a TAIL tool by design, and a live call confirmed it: "nothing to shrink". That is correct
+  and not a defect — the bulk of shrinkable text sits deep in history, and shrinking a node N back
+  re-bills every token AFTER it (~180k miss-equivalents on a heavy session) to free ~100 equivalents
+  per request. What pays is a giant FRESH dump near the tail (the archive's largest single result was
+  49,899 chars ≈ 12k tokens: shrinking it early saves ~1.2k equivalents on every later request). Its
+  value is therefore real but occasional, and it does nothing for a session that emits curated output.
+- test: 102/102 — the pairing rule, the snap-down direction and the refusal-still-stands case are pinned.
 ## v0.18.7
 
 - fix(banner): the quiet line no longer prints **how far the trigger is**. Evidence from the r32
