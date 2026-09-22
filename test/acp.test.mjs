@@ -139,7 +139,10 @@ test('the quiet line reports fullness against the WINDOW, and names the soft lim
   assert.match(line, /73% of the window/, 'window percentage first: ' + line);
   // The budget number hangs off the HARD ceiling; the soft number is NAMED as a trigger.
   assert.match(line, /hard ceiling 900000 — 170k of room/, 'ceiling room: ' + line);
-  assert.match(line, /soft trigger 780000 \(50k ahead; fold when you pass it, it is not a cap\)/, 'soft as a trigger: ' + line);
+  assert.match(line, /soft trigger 780000 \(fold when you pass it, it is not a cap\)/, 'soft as a trigger: ' + line);
+  // A distance number next to the trigger was read as a budget in a real session ("~7k before the
+  // soft trigger - I'm at the limit" -> the agent wrapped up and promised a fold that never came).
+  assert.ok(!/soft trigger \d+ \(\d+k ahead/.test(line), 'the banner must never print how far the trigger is: ' + line);
   // The misreading that cost turns: a soft number rendered as if it were the remaining context.
   // "soft limit 780000 — ~24k left" was read as "24k of context left", so agents stopped early.
   assert.ok(!/soft (limit|trigger) \d+ — ~?\d+k left/.test(line), 'the soft limit must never read as remaining context: ' + line);
@@ -157,7 +160,7 @@ test('the quiet line reports fullness against the WINDOW, and names the soft lim
 test('past the trigger the quiet line drops "no compaction needed" and orders the fold itself', () => {
   const { ctx, agent } = stub(800000);
   const line = renderStatus(ctx, agent, LIVE, 1000000, undefined, { quiet: true });
-  assert.match(line, /soft trigger 780000 \(passed;/, 'a passed trigger says so: ' + line);
+  assert.match(line, /soft trigger 780000 \(passed - fold now; not a cap\)/, 'a passed trigger says so: ' + line);
   assert.match(line, /past the soft trigger: fold now with acp_compress end:auto \(deep by default\)/, 'the action is named: ' + line);
   assert.match(line, /never a question for the user/, 'and the authority is explicit: ' + line);
   assert.ok(!/no compaction needed/.test(line), 'never claim there is nothing to do past the trigger: ' + line);

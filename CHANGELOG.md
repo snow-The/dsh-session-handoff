@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.18.7
+
+- fix(banner): the quiet line no longer prints **how far the trigger is**. Evidence from the r32
+  session: with `soft trigger 780000 (7k ahead; ...)` on screen the agent wrote "Budget: ~7k tokens
+  before the soft trigger — I'm at the limit ✓", wrapped the turn up and promised a compaction next
+  turn. The session was hovering 4-9k BELOW the trigger (121 banners, not one of them "past"), so the
+  host never fired and nothing happened — read as a budget, the distance made the agent stop short of
+  the thing it was describing. A small number next to a limit word gets read as runway whatever
+  preposition follows it, so the line now carries the STATE and the denial only:
+  `soft trigger 780000 (fold when you pass it, it is not a cap)` / `… (passed - fold now; not a cap)`.
+- fix(compress): a fold refused for splitting a step is **retried once** at the balanced boundary
+  `end: 'auto'` would have chosen, instead of ending as an error. Session 593a7635's last fold attempt
+  died exactly there (`end seq 14400 is not a balanced boundary (would split a step, or the step is
+  still open)`) right after the agent had told the user a compaction was coming. The retry can only
+  ever fold LESS than the caller asked for (the boundary is at or before the refused end) and it says
+  so in the tool's answer: `end N split a step: folded to the balanced boundary M instead`.
+- test: 99/99 — the retry is pinned by a compaction stub that refuses the first call.
 ## v0.18.6
 
 - fix(shrink): the first cut took the **oldest** eligible tool result — the expensive end. A

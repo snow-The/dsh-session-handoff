@@ -194,3 +194,45 @@ after(() => {
 });
 
 process.on('exit', () => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ } });
+/**
+ * A refused fold must not become a dead end.
+ *
+ * Real session evidence: the agent called acp_compress with an explicit end and the core answered
+ * "end seq 14400 is not a balanced boundary (would split a step, or the step is still open)". The
+ * agent had already told the user a compaction was coming, and none did. The plugin now retries ONCE
+ * at the boundary end:'auto' would have picked — the range only ever shrinks, so this can never fold
+ * more than the caller asked for.
+ */
+test('an end that would split a step is retried at the balanced boundary, never a dead end', async () => {
+  const registered = [];
+  const calls = [];
+  let used = 400000;
+  const meter = { measure: () => ({ totalTokens: used, nodes: Array.from({ length: 10 }, (_, i) => ({ seq: i + 1, tokens: 40000 })) }) };
+  const compaction = {
+    compactRegion: async (start, end) => {
+      calls.push([start, end]);
+      if (calls.length === 1) throw new Error('compactRegion: end seq ' + end + ' is not a balanced boundary (would split a step, or the step is still open)');
+      used = 120000;
+      return { shadowedRange: { start, end }, shadowedSeqs: [2, 3, 4] };
+    },
+  };
+  const ctx = {
+    tools: { register: (d) => { registered.push(d); return d; } },
+    get: (k) => (k === 'tokenMeter' ? meter : k === 'compaction' ? compaction : k === 'llm' ? { resolveModelInfo: async () => ({ contextWindow: 1000000 }) } : undefined),
+    logger: { info() {}, warn() {}, error() {}, debug() {} },
+    effect: () => {}, provide: () => {}, on: () => {},
+  };
+  apply(ctx, { minContextLimit: '78%', maxContextLimit: '90%' });
+  const session = {
+    id: 'snap-retry', surface: { nodes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+    ownEvents: () => [], requestHeader: () => ({ config: { provider: 'deepseek', model: 'probe' } }), ctx,
+  };
+  const agent = { session, ctx, options: {} };
+  const tool = registered.find((t) => t.name === 'acp_compress');
+  const out = await tool.execute({ start: 2, end: 5, deep: false, summary: 'a model-authored summary' }, { agent });
+  assert.equal(calls.length, 2, 'refused once, retried once: ' + JSON.stringify(calls));
+  assert.deepEqual(calls[0], [2, 5], 'the first attempt used exactly what the caller asked for');
+  assert.equal(calls[1][0], 2, 'the start is untouched');
+  assert.notEqual(calls[1][1], 5, 'the retry moved the END to the balanced boundary');
+  assert.match(String(out), /split a step: folded to the balanced boundary \d+ instead/, 'and the caller is told what happened: ' + out);
+});
