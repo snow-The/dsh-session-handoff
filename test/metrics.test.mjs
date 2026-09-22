@@ -95,7 +95,10 @@ test('the four layers name their gaps instead of filling them with zeros', () =>
   });
   assert.match(lines[0], /^L1 stored: 123178 tok on the surface \/ 920 nodes \/ 4 collapsed$/);
   assert.match(lines[1], /^L2 delivered \(billed\): 0 cached \+ 0 miss \(hit n\/a\)$/);
-  assert.match(lines[2], /^L3 work: 1 compaction\(s\), ~751488 tok lost to prefix-cache misses, ≈0\.676 CNY, 4200 ms of plugin-side fold calls, 12 user turns so far$/);
+  assert.match(lines[2], /^L3 work: 1 compaction\(s\), ~751488 tok re-sent uncached \(ESTIMATED from the post-fold context\), ≈0\.676 CNY, 4200 ms of plugin-side fold calls, 12 user turns so far$/);
+  // The estimate is a price taken at fold time; the bill is what the provider actually sent. An
+  // unsettled fold must read as "not measured yet", never as a measured zero.
+  assert.match(lines[3], /^L3 measured: no settled fold bill yet/, 'an unsettled fold is not a zero bill');
   assert.match(layerLines({ storedTokens: 1 })[1], /L2 delivered \(billed\): not recorded/, 'no cache data is not a zero-hit day');
 
   const empty = outcomeLines({ rows: [], sessionId: 's1', retrieval: { exists: false, path: 'x.jsonl' } });

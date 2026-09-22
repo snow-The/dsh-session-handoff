@@ -74,7 +74,7 @@ test('the host-fold fuse is configurable, and an unreadable value lands on the c
   assert.equal(cfg.hostTrigger, false, 'the host trigger can be turned off');
   assert.equal(cfg.hostTriggerAt, 'soft', 'and moved to the soft trigger');
   assert.equal(readSection('session-handoff:\n  hostTriggerAt: whenever\n').hostTriggerAt, 'hard', 'only two positions exist; anything else means the ceiling');
-  assert.equal(readSection('').hostTriggerAt, 'hard');
+  assert.equal(readSection('').hostTriggerAt, 'soft', 'the default hands the trigger to the host: the model cannot be the trigger');
   assert.equal(readSection('').hostTrigger, true);
 });
 

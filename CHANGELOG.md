@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.18.4
+
+- fix(policy): **the host now owns the trigger** — `hostTriggerAt` defaults to `soft`, so the host folds
+  when the trigger is passed instead of waiting for an agent that may stall. The model cannot be the
+  trigger: that makes the policy depend on it reading a number correctly, and the same complaint came
+  back three times (73% read as 100%; the soft limit read as the whole budget; then agents stopping to
+  ask the user to authorize compaction). Between the trigger and the ceiling nothing else fired, and
+  that gap is exactly where a stalled agent sits. The model still owns the RANGE whenever it folds
+  earlier than the trigger, so the normal `acp_compress` path is unchanged.
+- fix(metrics): the fold's cache price was taken from the **PRE**-fold prompt, while the cost falls on
+  the NEXT call, whose context is the **POST**-fold one (`docs/PREFIX-CACHE-STUDY.md` §3). Every row
+  therefore overstated its own fold by that fold's shrink factor. Measured on the eight rows in the
+  journal: 6,073,560 tokens / 5.465 CNY claimed against 1,707,791 / ~1.537 CNY on the honest base —
+  **3.56x**. Rows written before this version keep the old base; the L3 line now says which is which.
+- feat(metrics): the bill is **measured**, not predicted. A fold snapshots the session's cumulative
+  cache counters (`storages/session_projcache.json` — cumulative and disjoint) and the next pre-step
+  journals the delta as its own `kind: 'settle'` row (`uncachedTokens` / `cachedTokens` /
+  `estimatedTokens`). Fold sums go through `foldRows()`, so a settle row never counts as a fold, never
+  adds a second loss figure for the same event, and never turns "the gap between the last two folds"
+  into the milliseconds between a fold and its own settle row. L3 prints the estimate and the measured
+  bill as two labelled lines, and an unsettled fold reads as "not measured yet", never as a zero bill.
+- test: 93/93 — the settle row shape, the once-only settle, the fold-only sums and the L4 gap are pinned.
 ## v0.18.3
 
 - fix(banner): the per-turn ACP line said **"soft limit 780000 — ~24k left"**, and agents read that as

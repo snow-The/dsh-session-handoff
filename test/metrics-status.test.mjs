@@ -65,7 +65,8 @@ test('acp_status prints the budget ledger, the four layers and the pooled view',
     'ratio, absolute cap and unit in one line: ' + text.split('\n')[1]);
   assert.match(text, /L1 stored: 1234 tok on the surface \/ 3 nodes \/ 0 collapsed/);
   assert.match(text, /L2 delivered \(billed\): not recorded for this session yet/);
-  assert.match(text, /L3 work: 2 compaction\(s\), ~11000 tok lost to prefix-cache misses, ≈0\.900 CNY, 500 ms of plugin-side fold calls, 7 user turns so far/);
+  assert.match(text, /L3 work: 2 compaction\(s\), ~11000 tok re-sent uncached \(ESTIMATED from the post-fold context\), ≈0\.900 CNY, 500 ms of plugin-side fold calls, 7 user turns so far/);
+  assert.match(text, /L3 measured: no settled fold bill yet/, 'an unsettled fold must read as not measured, not as a zero bill');
   assert.match(text, /L4 outcome \(proxy\): gap between the last two folds 3\.0s/);
   assert.match(text, /retrieval signals: 2 degenerate answer\(s\) — 1 truncated, 1 unknown_id, 0 unresolved/);
   assert.match(text, /restatement of the same request by the user: NOT measured/);
