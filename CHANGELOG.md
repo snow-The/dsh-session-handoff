@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.18.11
+
+- fix(config): `cacheMissPricePerMTokens` — the ABSOLUTE price behind every CNY figure in the journal —
+  was read by the loss formula and settable **nowhere**: absent from DEFAULTS, so `readSection` dropped
+  it from settings.yaml silently and the function fell back to 1. The advice "set it to 2 for peak
+  hours" therefore did nothing. It is a real key now (DEFAULTS, coercion, the write block, acp_config,
+  acp_set_limit and resolveConfig), so the peak/off-peak difference is data. `cacheHitPriceRatio` stays
+  the RATIO, which does not move with the hour (0.02/1 = 0.04/2).
+- note: this is the THIRD key found in the same shape — read by code, missing from DEFAULTS, silently
+  unsettable from settings.yaml (`hostTrigger`/`hostTriggerAt` were the first, `compressTargetRatio` was
+  dropped on every write). A key that exists only in `resolveConfig` is a key the user cannot configure.
+- test: 107/107.
 ## v0.18.10
 
 - feat(guard): a fold must remove at least `minFoldRatio` (default **10%** of the context) or it is

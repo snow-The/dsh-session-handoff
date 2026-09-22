@@ -24,3 +24,13 @@ test('the hit-rate line reports the misses share under the same ratio', () => {
   assert.match(line, /misses are 4\d\.\d% of prompt cost/, line);
   assert.match(line, /98\.5% hit/);
 });
+// The ABSOLUTE miss price is data too. It was read by the loss formula and settable nowhere: absent
+// from DEFAULTS, so settings.yaml dropped it silently and the function fell back to 1.
+import { readSection } from '../lib/acp-config.js';
+
+test('the absolute miss price is configurable, and every CNY figure scales with it', () => {
+  assert.equal(readSection('session-handoff:\n  cacheMissPricePerMTokens: 2\n').cacheMissPricePerMTokens, 2,
+    'peak pricing is a setting, not a code edit');
+  assert.equal(readSection('').cacheMissPricePerMTokens, 1, 'the shipped default is the off-peak price');
+  assert.equal(compactionCacheLoss(1_000_000, 2, 0.02).costCNY, 1.96, 'at peak the same fold costs twice as much, and the ratio is unchanged');
+});
