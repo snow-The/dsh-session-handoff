@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.18.6
+
+- fix(shrink): the first cut took the **oldest** eligible tool result — the expensive end. A
+  replacement invalidates the provider prefix from the changed node **onward**, so the re-bill grows
+  with the distance from the tail: rewriting a result 2000 nodes back re-bills nearly the whole
+  context (~360k miss-equivalents on a heavy session) to free ~1k tokens of carry (~104 equivalents
+  per request). The scan is NEWEST-first inside a bounded `shrinkWindowNodes` (default 16), which
+  keeps the re-billed region to a few nodes; older bulk is left to the next fold, which pays one miss
+  for everything.
+- fix(shrink): `shrinkMinTokens` defaulted to 3000 **tokens** (~12k chars). Measured over a heavy
+  session's 3852 tool results (p50 586 chars, p75 1171, p90 2255, p95 3244, p99 7260, max 49899) that
+  sits above p99 and almost never fires — in a 170-result session it matched exactly one node. The
+  default is now 800 tokens (~3200 chars ≈ p95), where a head+tail shrink still reaches ~25% of all
+  tool text; the 1600-char keep budget caps the achievable yield near 30%, so pushing the threshold
+  lower buys little and costs a surface write per result.
+- note(measurement): why the default was wrong — the distribution was measured AFTER v0.18.5 shipped,
+  and it disagreed with the guess in both the unit and the order. Neither default had ever fired in
+  production (no `kind: 'shrink'` row), so the correction costs nothing retroactively.
+- test: 98/98 — the ordering (newest first), the window and the limit (cheapest candidate, not the
+  oldest) are pinned.
 ## v0.18.5
 
 - feat(shrink): **deterministic tool-result shrink** (`lib/shrink.js`) — head, tail and a marker that

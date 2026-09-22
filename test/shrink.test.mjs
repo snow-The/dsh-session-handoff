@@ -46,14 +46,20 @@ test('shrinkTargets skips the live tail, small results, images and already-shrun
   events.get(4).data.message.content[0].content = [{ type: 'text', text: '…[shrunk run_code · 8000 of 9000 chars elided — original in the session log, seq 4]' }];
   // protectedTail 2 with 6 nodes protects indices 4 and 5, so only node 1 survives every guard:
   // 2 is too small, 3 holds an image, 4 already carries the marker.
+  // protectedTail 2 with 6 nodes protects indices 4 and 5, so only node 1 passes every guard:
+  // 2 is too small, 3 holds an image, 4 already carries the marker.
   const targets = shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 2 });
   assert.deepEqual(targets.map((t) => t.seq), [1], 'the live tail is never touched');
   assert.equal(targets[0].toolName, 'run_code');
   // Move the guard and the same surface yields one more: the protection is the boundary, not a guess.
   const wider = shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 1 });
-  assert.deepEqual(wider.map((t) => t.seq), [1, 5]);
-  // And a limit is honoured in surface order — oldest first, which is what has been read longest ago.
-  assert.deepEqual(shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 1, limit: 1 }).map((t) => t.seq), [1]);
+  assert.deepEqual(wider.map((t) => t.seq), [5, 1], 'NEWEST first: a replacement re-bills the prefix from that node onward, so distance from the tail is the cost');
+  assert.deepEqual(shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 1, limit: 1 }).map((t) => t.seq), [5], 'the limit takes the cheapest candidate, not the oldest');
+  // The window is what bounds the re-billed region: one node back sees only node 5, two nodes back
+  // reaches node 1 as well.
+  assert.deepEqual(shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 1, windowNodes: 1 }).map((t) => t.seq), [5]);
+  assert.deepEqual(shrinkTargets({ nodes, eventBySeq: events, minTokens: 3000, protectedTail: 1, windowNodes: 5 }).map((t) => t.seq), [5, 1],
+    'five nodes back reaches node 1 (index 0); three would stop at index 2');
 });
 
 test('a replacement is one node, same type, and differs from the original ONLY in content', () => {
