@@ -21,6 +21,18 @@
 - test: 88/88. The quiet-banner contract test pins the live config (78%/90% — the code default is
   60%/60%, where every "room" assertion degenerates to "reached" and proves nothing), forbids the
   soft-limit-as-remaining-context shape, and adds past-trigger / past-ceiling cases.
+- fix(config): `hostTrigger` / `hostTriggerAt` existed in `resolveConfig` but were **absent from
+  DEFAULTS** — and `readSection` reads only the keys it finds there, so settings.yaml could not move
+  the host-fold fuse at all: the trigger stayed pinned to 'hard'. Between the soft trigger and the
+  ceiling the MODEL was then the only thing that could compact, which is precisely the gap where
+  agents stalled and asked the user to authorize compaction. Both keys are configurable now
+  (`hostTriggerAt: soft` hands the trigger to the host, taking the model out of the loop) and are
+  shown by acp_config / acp_set_limit.
+- fix(config): `writeAcpConfig` rebuilt the section from a fixed template that omitted
+  `compressTargetRatio`, so ANY acp_set_limit call silently deleted a configured deep-fold target. It
+  now writes every key it reads, and the ratio is parsed as a fraction (unusable value -> default)
+  instead of being carried around as a string.
+- test: 90/90 — the fuse round-trip and the unreadable-value fallback are pinned.
 
 ## v0.18.2
 

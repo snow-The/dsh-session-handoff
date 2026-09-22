@@ -65,6 +65,36 @@ test('round-trip: set then read persists', async () => {
   assert.equal(cfg.maxContextLimit, '80%');
 });
 
+// Both fuse keys lived in resolveConfig but NOT in DEFAULTS, and readSection reads only the keys it
+// finds in DEFAULTS — so settings.yaml could not move the fuse at all: the host trigger stayed pinned
+// to 'hard', and between the soft trigger and the ceiling the MODEL was the only thing that could
+// compact. That gap is exactly where agents stalled and asked the user to authorize compaction.
+test('the host-fold fuse is configurable, and an unreadable value lands on the ceiling', () => {
+  const cfg = readSection(['session-handoff:', '  hostTrigger: false', '  hostTriggerAt: soft', ''].join('\n'));
+  assert.equal(cfg.hostTrigger, false, 'the host trigger can be turned off');
+  assert.equal(cfg.hostTriggerAt, 'soft', 'and moved to the soft trigger');
+  assert.equal(readSection('session-handoff:\n  hostTriggerAt: whenever\n').hostTriggerAt, 'hard', 'only two positions exist; anything else means the ceiling');
+  assert.equal(readSection('').hostTriggerAt, 'hard');
+  assert.equal(readSection('').hostTrigger, true);
+});
+
+test('writing the config never drops a key it read, and the fold target stays a fraction', async () => {
+  writeFileSync(join(tmp, 'settings.yaml'), ['session-handoff:', '  minContextLimit: "70%"', '  compressTargetRatio: 0.5', ''].join('\n'));
+  const tools = [];
+  mod.registerAcpConfigTools({ tools: { register: (t) => tools.push(t) } });
+  const set = tools.find((t) => t.name === 'acp_set_limit');
+  await set.execute({ maxContextLimit: '85%' }, {});
+  let text = readFileSync(join(tmp, 'settings.yaml'), 'utf8');
+  assert.ok(text.includes('compressTargetRatio: 0.5'), 'the deep-fold target survived the rewrite:\n' + text);
+  assert.equal(readSection(text).compressTargetRatio, 0.5, 'and it reads back as a NUMBER, not a string');
+  assert.equal(readSection(text).maxContextLimit, '85%');
+  await set.execute({ hostTriggerAt: 'soft' }, {});
+  text = readFileSync(join(tmp, 'settings.yaml'), 'utf8');
+  assert.equal(readSection(text).hostTriggerAt, 'soft', 'the fuse round-trips through settings.yaml');
+  await assert.rejects(() => set.execute({ hostTriggerAt: 'sometimes' }, {}), /must be "soft" or "hard"/);
+  assert.equal(readSection('session-handoff:\n  compressTargetRatio: banana\n').compressTargetRatio, 0.35, 'an unusable fraction falls back to the default');
+});
+
 // The inconsistency this test exists for: the UI slider capped at 90 while the TOOL accepted up to
 // 95, so settings.yaml (88/95) described a configuration the panel could not even display. The more
 // permissive writer won. One ceiling, checked from both ends.
