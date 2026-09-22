@@ -246,3 +246,52 @@ test('an end that would split a step is retried at the balanced boundary, never 
   assert.ok(calls[1][1] < 5, 'a retry is a SUBSET of what the caller asked for, never a bigger fold');
   assert.match(String(out), /split a step: folded DOWN to the balanced boundary 4 instead/, 'and the caller is told what happened: ' + out);
 });
+/**
+ * A fold pays back only if it removes a real share of the context.
+ *
+ * Live probe that motivated this: a 596-token fold of a 507k context answered "the next call re-sends
+ * ~507,508 tokens uncached (≈0.497)" — one full-prefix miss to save ~12 tokens per request, i.e. a
+ * 41,700-request payback. The guard refuses such a fold and says why, instead of quietly paying.
+ */
+function bootShare({ nodes = 100, per = 4000 } = {}) {
+  const registered = [];
+  const calls = [];
+  const meter = { measure: () => ({ totalTokens: nodes * per, nodes: Array.from({ length: nodes }, (_, i) => ({ seq: i + 1, tokens: per })) }) };
+  const compaction = {
+    compactRegion: async (start, end) => { calls.push([start, end]); return { shadowedRange: { start, end }, shadowedSeqs: [start] }; },
+  };
+  const ctx = {
+    tools: { register: (d) => { registered.push(d); return d; } },
+    get: (k) => (k === 'tokenMeter' ? meter : k === 'compaction' ? compaction : undefined),
+    logger: { info() {}, warn() {}, error() {}, debug() {} },
+    effect: () => {}, provide: () => {}, on: () => {},
+  };
+  apply(ctx, { minContextLimit: '78%', maxContextLimit: '90%' });
+  const session = {
+    id: 'share-' + nodes + '-' + per, surface: { nodes: Array.from({ length: nodes }, (_, i) => i + 1) },
+    ownEvents: () => [], requestHeader: () => ({ config: {} }), ctx,
+  };
+  return { agent: { session, ctx, options: {} }, registered, calls };
+}
+
+test('a fold too small to pay for its own cache miss is refused, with the arithmetic', async () => {
+  const { agent, registered, calls } = bootShare();
+  const tool = registered.find((t) => t.name === 'acp_compress');
+  await assert.rejects(
+    () => tool.execute({ start: 2, end: 2, deep: false, summary: 'cosmetic' }, { agent }),
+    (err) => {
+      assert.match(String(err.message), /would remove ~4000 of ~400000 tokens \(1\.0%\)/, err.message);
+      assert.match(String(err.message), /break-even is ~\d+ later requests/, 'the arithmetic is shown: ' + err.message);
+      assert.match(String(err.message), /at least 10% of the context/, 'and the way out is named');
+      return true;
+    },
+  );
+  assert.deepEqual(calls, [], 'nothing was folded, so no miss was paid');
+});
+
+test('a fold that removes a real share goes through', async () => {
+  const { agent, registered, calls } = bootShare();
+  const tool = registered.find((t) => t.name === 'acp_compress');
+  await tool.execute({ start: 2, end: 50, deep: false, summary: 'half the surface' }, { agent });
+  assert.deepEqual(calls, [[2, 50]], '49% of the context is worth the miss');
+});

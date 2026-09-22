@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.18.10
+
+- feat(guard): a fold must remove at least `minFoldRatio` (default **10%** of the context) or it is
+  refused, with the arithmetic in the message. Motivated by the probe that verified the snap-down
+  retry: folding 596 tokens of a 507k context answered "the next call re-sends ~507,508 tokens uncached
+  (≈0.497)" — one full-prefix miss to save ~12 tokens per request, a **41,700-request payback**.
+  Break-even is ~49 x (context / folded) later requests, so a cosmetic fold never pays; the error names
+  the way out (`deep:true` or a wider range). The same check runs on the SNAPPED range too, because a
+  retry is smaller than the request and could otherwise pay a full miss for a sub-economic fold.
+- note(verified live): the snap-down retry works end to end. A deliberately unbalanced `end` (a seq that
+  opens a tool call) was refused by the core and the plugin folded 20757-20764 instead: 3 nodes,
+  508,104 -> 507,508, reported as "end 20765 split a step: folded DOWN to the balanced boundary 20764
+  instead". The journal row priced it on the POST-fold context (lossTokens == after) and the M1 block
+  store kept the original (`blocks saved: 1`).
+- known gap (recorded, not papered over): the MEASURED half of the bill — `settle` rows and the L2 cache
+  line — reads `storages/session_projcache.json`, and a LIVE session has no row there yet (checked: this
+  session and the one that folded twice are both absent; the store is written by the harness's
+  projection cache at ITS checkpoints). So `L3 measured` currently reads "no settled fold bill yet" for
+  an active session. The live service is `ctx.sessionProjectionCache.recordFor(id, identity)`, which
+  needs the log-identity witness; the self-contained alternative is to aggregate the per-attempt usage
+  the session log already carries. Either is a real change, not a constant — it is next, not hidden.
+- test: 106/106 — the share guard is pinned both ways (refused with arithmetic, and a 49% fold passing).
 ## v0.18.9
 
 - fix(price): `CACHE_HIT_PRICE_RATIO` was 0.1. DeepSeek's published table (2026-09) is **0.02 / 1 CNY**
