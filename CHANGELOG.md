@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.18.5
+
+- feat(shrink): **deterministic tool-result shrink** (`lib/shrink.js`) — head, tail and a marker that
+  names the seq still holding the original, written with NO model call, no summary and no surface-wide
+  fold. Measured on our two heaviest sessions, 79-87% of billed prompt tokens were cache reads
+  re-sending context (f20d1471: 3.51B cached vs 52.5M uncached; b0e810e7: 1.53B vs 41.4M) against
+  ~0.27M miss-equivalents for one fold — so the lever is the carried SIZE, and an already-read tool
+  dump is the cheapest thing to cut. It runs on the pre-step before the fold decision, and is exposed
+  as `acp_shrink` for a manual batch. Guards: only `tool/result`; only at least `shrinkMinTokens`;
+  never within the last `shrinkProtectedTail` nodes (the live tail is what the agent is reasoning
+  about); never a block holding an image; never one that already carries the marker; at most
+  `shrinkMaxPerStep` per pass.
+- fix(shrink): `isShrunkContent` tested `startsWith` while the marker sits AFTER the head, so the
+  "already shrunk" guard could never fire — the same result would have been cut again on every pass.
+  The test caught it; it is a substring test now.
+- note(contract): the replacement event shape was verified against the REAL session validator, not
+  against a reading of it: constructing a real `Session`, appending a tool result, then appending the
+  replacement is ACCEPTED (surface [0,1] -> [0,2], derived text 20,000 -> 1,658 chars), while changing
+  the message id instead is refused with "tool/result surface replacement may change only content".
+  A one-node rewrite of the same type with only the content changed is the single form the contract
+  allows, and it is the form that keeps the prefix cache intact.
+- feat(metrics): shrink rows are neither folds nor settles (`kind: 'shrink'`, with before/after/freed),
+  are counted separately in `pooledSummary`, and print as their own L3 line — folding them into the
+  compaction count would misstate the summary calls, the cache misses and the quality loss at once.
+- test: 98/98.
 ## v0.18.4
 
 - fix(policy): **the host now owns the trigger** — `hostTriggerAt` defaults to `soft`, so the host folds
