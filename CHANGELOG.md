@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.18.3
+
+- fix(banner): the per-turn ACP line said **"soft limit 780000 — ~24k left"**, and agents read that as
+  *their remaining context*: near the trigger they went conservative and stopped a turn early. The room
+  number now hangs off the HARD ceiling ("hard ceiling 900000 — 170k of room") and the soft number is
+  named for what it is — "soft trigger 780000 (50k ahead; fold when you pass it, **it is not a cap**)".
+  One number answers "how much room do I have"; the other answers "when do I fold".
+- fix(banner): the action sentence was the constant "below soft limit, no compaction needed" — printed
+  even PAST the trigger, because the level was computed in quiet mode and then never read. It now
+  follows the level: below -> keep working; past the trigger -> fold now with acp_compress end:auto;
+  past the ceiling -> compress before any other work. The contradiction with the instruction section
+  (which says to fold when the trigger is passed) is what left agents stopping to ask the user to
+  authorize compaction.
+- fix(instructions): the ACP section now names the two thresholds as different kinds of thing — the soft
+  limit is a TRIGGER you own, the hard limit is the CAP on the window — and grants standing authority
+  explicitly: folding is your own call, never a question for the user, never a turn spent waiting for
+  permission (it is reversible; acp_decompress returns the original text). Same naming in acp_status,
+  acp_config and acp_set_limit, so the tools cannot reintroduce the "soft limit = the limit" reading.
+- test: 88/88. The quiet-banner contract test pins the live config (78%/90% — the code default is
+  60%/60%, where every "room" assertion degenerates to "reached" and proves nothing), forbids the
+  soft-limit-as-remaining-context shape, and adds past-trigger / past-ceiling cases.
+
 ## v0.18.2
 
 - fix(graph): `acp_graph build` carried the SAME `session.events` bug as the two metric fields, in its

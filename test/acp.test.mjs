@@ -128,19 +128,48 @@ const stub = (usedTokens) => ({
   agent: { session: { id: 's', surface: { nodes: [] } } },
 });
 
-test('the quiet line reports fullness against the WINDOW, and the soft limit as a threshold', () => {
+// The live configuration: a 78% soft trigger and a 90% hard ceiling on a 1M window. The code default
+// is 60%/60%, where every test assertion about "room" degenerates to "reached" — so pin it explicitly.
+const LIVE = { minContextLimit: '78%', maxContextLimit: '90%' };
+
+test('the quiet line reports fullness against the WINDOW, and names the soft limit a trigger it is not a cap', () => {
   const { ctx, agent } = stub(730000);
-  const line = renderStatus(ctx, agent, {}, 1000000, undefined, { quiet: true });
+  const line = renderStatus(ctx, agent, LIVE, 1000000, undefined, { quiet: true });
   assert.match(line, /^ACP: 730000\/1000000 tokens \(/, 'the live banner shape: ' + line);
   assert.match(line, /73% of the window/, 'window percentage first: ' + line);
-  // the resolved limits depend on config — assert they are NAMED as thresholds with their own
-  // number and headroom, not that they equal a particular value
-  assert.match(line, /soft limit \d+ — (reached|~\d+k left)/, 'soft headroom: ' + line);
-  assert.match(line, /hard \d+ — (reached|~\d+k left)/, 'hard headroom must also be shown: ' + line);
+  // The budget number hangs off the HARD ceiling; the soft number is NAMED as a trigger.
+  assert.match(line, /hard ceiling 900000 — 170k of room/, 'ceiling room: ' + line);
+  assert.match(line, /soft trigger 780000 \(50k ahead; fold when you pass it, it is not a cap\)/, 'soft as a trigger: ' + line);
+  // The misreading that cost turns: a soft number rendered as if it were the remaining context.
+  // "soft limit 780000 — ~24k left" was read as "24k of context left", so agents stopped early.
+  assert.ok(!/soft (limit|trigger) \d+ — ~?\d+k left/.test(line), 'the soft limit must never read as remaining context: ' + line);
+  assert.match(line, /below the trigger: keep working/, 'below the trigger the line says keep working: ' + line);
+  assert.match(line, /never a question for the user/, 'the banner grants standing authority to fold: ' + line);
   assert.ok(!/\(100%\)/.test(line), 'a bare 100% must never appear: ' + line);
-  assert.ok(!/soft limit \d+ = \d+%/.test(line), 'the threshold must never be stated as a ratio: ' + line);
+  assert.ok(!/soft trigger \d+ = \d+%/.test(line), 'the threshold must never be stated as a ratio: ' + line);
   assert.ok(!/= \d+%/.test(line), 'no bare threshold ratio anywhere: ' + line);
   assert.ok(!/window unknown/.test(line), 'a known window must not carry the diagnostic: ' + line);
+});
+
+// Existing sibling complaint, same class of failure: agents crossing the trigger stopped and asked the
+// user to authorize compaction, because the banner kept saying "no compaction needed" (the level was
+// computed and never read) while the instruction section said to fold when the trigger is passed.
+test('past the trigger the quiet line drops "no compaction needed" and orders the fold itself', () => {
+  const { ctx, agent } = stub(800000);
+  const line = renderStatus(ctx, agent, LIVE, 1000000, undefined, { quiet: true });
+  assert.match(line, /soft trigger 780000 \(passed;/, 'a passed trigger says so: ' + line);
+  assert.match(line, /past the soft trigger: fold now with acp_compress end:auto \(deep by default\)/, 'the action is named: ' + line);
+  assert.match(line, /never a question for the user/, 'and the authority is explicit: ' + line);
+  assert.ok(!/no compaction needed/.test(line), 'never claim there is nothing to do past the trigger: ' + line);
+  assert.ok(!/below the trigger/.test(line), 'and never describe a passed trigger as below it: ' + line);
+});
+
+test('past the ceiling the line stops being optional about compaction', () => {
+  const { ctx, agent } = stub(910000);
+  const line = renderStatus(ctx, agent, LIVE, 1000000, undefined, { quiet: true });
+  assert.match(line, /hard ceiling 900000 — reached/, 'the ceiling reads as reached: ' + line);
+  assert.match(line, /past the HARD ceiling: compress before any other work/, 'the hard action is named: ' + line);
+  assert.match(line, /do not ask the user/, 'no permission-seeking at the ceiling: ' + line);
 });
 
 test('an unknown window degrades to the threshold alone, never a fake percentage — and says why', () => {
@@ -157,10 +186,10 @@ test('an unknown window degrades to the threshold alone, never a fake percentage
 test('the per-turn banner text has exactly one owner in lib/', () => {
   const dir = new URL('../lib/', import.meta.url);
   const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
-  const owners = files.filter((f) => readFileSync(new URL(f, dir), 'utf8').includes('below soft limit, no compaction needed'));
+  const owners = files.filter((f) => readFileSync(new URL(f, dir), 'utf8').includes('it is not a cap'));
   assert.deepEqual(owners, ['index.js'], 'the banner text must live in exactly one file, found: ' + owners.join(', '));
   const code = readFileSync(new URL('index.js', dir), 'utf8');
-  assert.equal((code.match(/below soft limit, no compaction needed/g) ?? []).length, 1, 'and exactly once');
+  assert.equal((code.match(/it is not a cap/g) ?? []).length, 1, 'and exactly once');
 });
 
 // --- the window cache: a probe that fails silently is worse than no probe ---------------
