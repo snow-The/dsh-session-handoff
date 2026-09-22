@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.18.9
+
+- fix(price): `CACHE_HIT_PRICE_RATIO` was 0.1. DeepSeek's published table (2026-09) is **0.02 / 1 CNY**
+  per million input tokens off-peak and **0.04 / 2** peak — a cache hit costs **2%** of a miss at either
+  hour. The constant weights the CARRYING term (cache reads) against the FOLDING term (one full miss),
+  so being 5x too expensive on the hit side made carrying look 5x worse than it is and INVERTED the
+  advice it fed: the "lower the soft trigger to 50-60%" proposal of the previous round is a net LOSS at
+  2% (the carrying it saves is 5x smaller than that estimate, and each extra fold costs relatively 5x
+  more). **Retracted**; the standing advice is fewer, later, deeper folds — what `acp-recommend` already
+  said, now for the right reason.
+- note: the per-fold money estimate barely moved (the factor is `1 - ratio`: 0.9 -> 0.98, ~9% higher).
+  What moves by 5x is the reported SPLIT in `formatCacheLine`: for session-f20d1471 the same counters
+  now read "misses are 43% of prompt cost" instead of 13%.
+- feat(config): `cacheHitPriceRatio` is a setting (default 0.02). Prices are DATA — a provider or plan
+  change must not need a code edit — and the peak/off-peak doubling does not move the ratio at all.
+- test: 104/104. The ratio, the `(miss - hit)` formula, the peak-price case and the reported split are
+  pinned; the two pre-existing assertions that encoded 0.9 were updated with the table as the reason.
+  They caught the change, which is exactly what they were for.
 ## v0.18.8
 
 - fix(compress): the v0.18.7 retry moved a refused `end` to the boundary `end: 'auto'` picks — the one

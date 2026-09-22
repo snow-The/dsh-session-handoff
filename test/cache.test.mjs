@@ -49,11 +49,15 @@ test('a torn or unreadable store degrades to null instead of throwing', () => {
 });
 
 test('compaction cost = whole prompt re-sent at (miss - hit) price', () => {
-  assert.deepEqual(compactionCacheLoss(200000, 1), { tokens: 200000, costCNY: 0.18 });
+  // The hit price is 2% of the miss price (DeepSeek's published 0.02/1 off-peak, 0.04/2 peak), so
+  // re-sending a token that would have been a hit costs 0.98 of the miss price. These numbers moved
+  // when that constant was corrected from 0.1 to 0.02 — deliberately, with the table as the source,
+  // because this factor weights carrying against folding and the wrong value inverted the advice.
+  assert.deepEqual(compactionCacheLoss(200000, 1), { tokens: 200000, costCNY: 0.196 });
   assert.deepEqual(compactionCacheLoss(0, 1), { tokens: 0, costCNY: 0 });
   assert.deepEqual(compactionCacheLoss(-5, 1), { tokens: 0, costCNY: 0 });
-  assert.deepEqual(compactionCacheLoss('120000', 2), { tokens: 120000, costCNY: 0.216 });
-  assert.deepEqual(compactionCacheLoss(1000000, Number.NaN).costCNY, 0.9); // bad price -> default 1
+  assert.deepEqual(compactionCacheLoss('120000', 2), { tokens: 120000, costCNY: 0.235 });
+  assert.deepEqual(compactionCacheLoss(1000000, Number.NaN).costCNY, 0.98); // bad price -> default 1
 });
 
 test('the status line states the hit rate AND what misses cost', () => {
