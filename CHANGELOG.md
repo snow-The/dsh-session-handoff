@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.18.12
+
+- fix(shrink): **defer to the harness pruner when it has one.** DSH rc.3 ships
+  `@deepseek-ai/dsh-compaction-tool-result-pruner` — head + a "middle pruned" marker + tail, no model
+  call, **code-point slicing so it cannot split a surrogate pair**, driven by `dsh-compaction-basic`
+  through the `toolResultPruner` service, and mounted by the official standard/ptc/cordis presets. That
+  is this plugin's `lib/shrink.js` design, upstream and integrated, so running both would rewrite the
+  same tool results twice and double-count against its shadow-price ledger. Ours now checks
+  `ctx.get('toolResultPruner')` and stays out of the way (logging the deferral once); it still runs on
+  a harness with no pruner, and the manual `acp_shrink` tool works either way.
+- note: this is the second time in one week that a hand-built mechanism turned out to exist upstream
+  (the first was the code-point truncation the pruner also brought). Worth checking the release notes of
+  the installed harness before building a second owner for anything that touches the request path.
 ## v0.18.11
 
 - fix(config): `cacheMissPricePerMTokens` — the ABSOLUTE price behind every CNY figure in the journal —
