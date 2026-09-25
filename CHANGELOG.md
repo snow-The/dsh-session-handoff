@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.18.13
+
+- feat(format): the document layer now speaks **session format V4 as well as V3**. DSH 0.1.7-rc.2 moved
+  to V4, whose migration (`dsh-session-format-v3-to-v4`, "Tool-result representation") LIFTS the tool
+  result out of its wrapper: `role: 'user'` + `content[0] = {type:'tool-result', toolCallId, content}`
+  becomes `role: 'tool'` + `message.toolCallId` + `content` = the parts, with the wrapper's other fields
+  renamed to `plugin:result:<name>`. Reading only V3 on a V4 log fails SILENTLY — no error, the pass
+  simply never matches a result — and a V4 tool message read as an assistant turn makes every pairing
+  cut look unbalanced, which would have disabled the snap-down retry exactly when it is needed.
+  - `lib/shrink.js`: one reader (`toolResultOf`) and one writer (`withResultParts`) for both shapes;
+    `shrinkTargets` returns the shape it found and a replacement is re-emitted in that same shape.
+  - `lib/pairing.js`: a call is closed by the V3 `tool-result` wrapper OR by a V4 `role:'tool'` message;
+    the two representations produce identical cuts.
+  - `index.js`: the shrink rewrite uses the shape-aware writer, so a V4 log gets a V4 replacement.
+- test: 109/109, with the new suite covering both representations (a surface holding BOTH shapes at once,
+  the newest-first order, and the image/size/marker guards).
+- verified against the REAL implementations, not a reading of them: on 0.1.5-rc.3 (v3 header) and on
+  0.1.7-rc.2 (v4 header) the shrink replacement is ACCEPTED by each version's own validator, the derived
+  text drops 20,000 -> 1,687 chars, and `balancedCutsAfter` matches the harness's own
+  `toolPairingBalancedAfter` **node by node with 0 mismatches on both**. Negative control: the V3-shaped
+  replacement is refused on a V4 session, so the adapter is load-bearing rather than decorative.
 ## v0.18.12
 
 - fix(shrink): **defer to the harness pruner when it has one.** DSH rc.3 ships
