@@ -138,3 +138,56 @@ test('session_list tolerates the old bare-header shape too', async () => {
   assert.match(printed, /session-old/);
   assert.ok(!/undefined/.test(printed));
 });
+
+// --- regression: session_trash must actually MOVE the artifact ------------------
+// 症状(rc.2): 工具报告 "artifact moved to trash" 并记账, 但磁盘上的会话目录纹丝不动,
+// 于是 session_restore 也无从恢复。根因是 locateSession 调用
+// `ctx.sessionPersistence?.locate?.(...)` —— 官方 SessionPersistence 上根本没有
+// locate(只有 create/open/flush/stat/list), 可选链把"方法不存在"静默变成 undefined,
+// 于是 originalPath 恒为 undefined, 移动分支永不执行。
+//
+// 为什么原有 109 个测试没抓到: 它们一律传 `list: async () => []`, locateSession
+// 直接在第一行就返回, 移动分支从未被走到。这里造真实产物把该分支逼出来。
+test('session_trash moves the artifact directory into the trash', async () => {
+  const { registerSessionMgmtTools } = mod;
+  const { mkdirSync, writeFileSync, existsSync: ex } = await import('node:fs');
+
+  const home = mkdtempSync(join(tmpdir(), 'smgmt-artifact-'));
+  const prevHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  try {
+    const cwd = 'C:\\work\\proj';
+    const slug = '--C-work-proj--';
+    const id = 'aaaaaaaa-1111-2222-3333-444444444444';
+    const sessionDir = join(home, 'sessions', slug, `session-${id}`);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, 'session.jsonl.zstd'), 'x');
+    assert.ok(ex(sessionDir), 'fixture session dir must exist before the call');
+
+    const registered = [];
+    const ctx = {
+      tools: { register: (t) => registered.push(t) },
+      // 快照带 cwd: locateSession 用它走 sessionFilePath 的 <cwd-slug> 主布局。
+      // (若实现退化到"不传 cwd 的递归兜底", 该目录同样能被找到, 但那条路径另有
+      //  graph.js 的测试覆盖; 此处只锁定"产物确实被移动"这一行为。)
+      sessionPersistence: {
+        list: async () => [{ header: { id: `session-${id}`, cwd }, revision: 'r1' }],
+      },
+      workspaceRegistry: {},
+      agents: { get: () => undefined },
+      logger: { info() {}, warn() {}, debug() {} },
+    };
+    registerSessionMgmtTools(ctx);
+
+    const trash = registered.find((t) => t.name === 'session_trash');
+    const out = await trash.execute({ sessionId: `session-${id}` }, {});
+
+    const trashed = join(home, 'dsh-session-handoff-trash', `session-${id}`);
+    assert.ok(!ex(sessionDir), '原会话目录必须已被移走: ' + sessionDir);
+    assert.ok(ex(trashed), '产物必须出现在回收站: ' + trashed);
+    assert.match(out, /artifact moved to trash/, '工具必须如实报告已移动: ' + out);
+  } finally {
+    process.env.DSH_HOME = prevHome;
+    rmSync(home, { recursive: true, force: true });
+  }
+});
