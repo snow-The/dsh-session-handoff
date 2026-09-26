@@ -26,7 +26,7 @@ writeFileSync(process.env.DSH_NOTEMAP_RETRIEVAL,
   + JSON.stringify({ v: 1, tool: 'notemap_paths', unknown_id: 'readimm8' }) + '\n');
 
 const { apply, dispose } = await import('../lib/index.js');
-const { readMetrics } = await import('../lib/metrics.js');
+const { readMetrics, formatCheckpointLines } = await import('../lib/metrics.js');
 
 // A fold starts the ingest worker; its MessagePort is a live handle, so the suite must end it
 // explicitly or the test process hangs forever with no failing test to show for it.
@@ -294,4 +294,49 @@ test('a fold that removes a real share goes through', async () => {
   const tool = registered.find((t) => t.name === 'acp_compress');
   await tool.execute({ start: 2, end: 50, deep: false, summary: 'half the surface' }, { agent });
   assert.deepEqual(calls, [[2, 50]], '49% of the context is worth the miss');
+});
+
+// ---------------------------------------------------------------------------
+// The checkpoint table. `acp_decompress` matches a CHECKPOINT, not an arbitrary range, so a model
+// that wants to retrieve something must be able to READ the boundary somewhere a tool prints. The
+// journal always held {start, end}; these two tests pin that it reaches the text.
+// ---------------------------------------------------------------------------
+
+test('acp_status prints the exact shadowed range of every checkpoint', async () => {
+  const { registered, agent } = boot();
+  const text = await registered.find((t) => t.name === 'acp_status').execute({}, { agent });
+  assert.match(text, /recoverable checkpoints \(acp_decompress needs these EXACT boundaries\):/);
+  assert.match(text, /s1-s9 {2}8 node\(s\) {2}10000->4000 tok/,
+    'the first fold row must be readable with both endpoints: ' + text);
+  assert.match(text, /s10-s20 {2}10 node\(s\) {2}8000->3000 tok/);
+});
+
+test('a checkpoint table is per-session and de-duplicated — it is a retrieval index, not a log', () => {
+  const rows = [
+    { ts: 1, session: 's1', start: 5, end: 9, nodes: 4 },
+    { ts: 2, session: 's1', start: 5, end: 9, nodes: 4 },          // retried write of the same fold
+    { ts: 3, session: 's2', start: 1, end: 2, nodes: 1 },          // another session
+    { ts: 4, session: 's1', start: 10, end: 20, nodes: 10, before: 8000, after: 3000 },
+    { ts: 5, session: 's1', kind: 'settle', start: 99, end: 99 },  // settle rows are not folds
+  ];
+  const lines = formatCheckpointLines(rows, 's1');
+  assert.equal(lines.length, 3, 'one header + two distinct folds: ' + JSON.stringify(lines));
+  assert.ok(lines.some((l) => /s5-s9/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /s10-s20/.test(l)), lines.join('\n'));
+  assert.ok(!lines.some((l) => /s1-s2|s99/.test(l)), 'other sessions and settle rows must not appear: ' + lines.join('\n'));
+  // `s5-s9`, not `5-9`: the prefix is load-bearing. acp_decompress takes INTS, but every id a
+  // caller reads elsewhere (the surface map, the checkpoint message, acp_search) carries the `s`,
+  // so a table without it invites a copy-paste that fails the surface check.
+  assert.ok(lines[1].includes('s5-s9') && lines[2].includes('s10-s20'), 'ordered by start: ' + lines.join('\n'));
+});
+
+test('no folds means no checkpoint header — it does not print an empty table', async () => {
+  const text = await (async () => {
+    process.env.DSH_ACP_METRICS = join(dir, 'absent2.jsonl');
+    const { registered, agent } = boot();
+    const t = await registered.find((x) => x.name === 'acp_status').execute({}, { agent });
+    process.env.DSH_ACP_METRICS = join(dir, 'acp-metrics.jsonl');
+    return t;
+  })();
+  assert.ok(!/recoverable checkpoints/.test(text), 'an empty table is noise: ' + text);
 });
