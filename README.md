@@ -64,7 +64,7 @@ Trash entries persist as JSON under `$DSH_HOME/dsh-session-handoff-trash/`
 
 | Tool | Purpose |
 |---|---|
-| `model_routes` | List every route serving `deepseek-v4-flash`: provider, baseURL, key env + family (ark-/sk-), default marker (incl. vision-toolkit- variants), vision wrapper variant |
+| `model_routes` | List every route serving `deepseek-v4.1-flash`: provider, baseURL, key env + family (ark-/sk-), default marker (incl. vision-toolkit- variants), vision wrapper variant |
 | `model_switch` | Point agent-default-model at a route (persisted to settings.yaml; new sessions use it). Optional `vision:true` selects the vision wrapper variant; warns when the key family is missing |
 
 Built for users sharing one model id across official DeepSeek and Volcano

@@ -52,8 +52,8 @@ test('writeFailoverRoutes persists an ordered list and readFailoverRoutes round-
 test('parseFailoverEntry / formatFailoverEntry handle provider:model:effort', () => {
   const { parseFailoverEntry, formatFailoverEntry } = mod.__internals;
   assert.deepEqual(parseFailoverEntry('deepseek'), { provider: 'deepseek' });
-  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4-flash'), { provider: 'deepseek', model: 'deepseek-v4-flash' });
-  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4-flash:max'), { provider: 'deepseek', model: 'deepseek-v4-flash', effort: 'max' });
+  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4.1-flash'), { provider: 'deepseek', model: 'deepseek-v4.1-flash' });
+  assert.deepEqual(parseFailoverEntry('deepseek:deepseek-v4.1-flash:max'), { provider: 'deepseek', model: 'deepseek-v4.1-flash', effort: 'max' });
   assert.equal(parseFailoverEntry(''), null);
   assert.equal(formatFailoverEntry({ provider: 'a', model: 'm', effort: 'high' }), 'a:m:high');
   assert.equal(formatFailoverEntry({ provider: 'a' }), 'a');

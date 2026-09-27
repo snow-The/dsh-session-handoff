@@ -16,14 +16,14 @@ llm-pi-ai:
     deepseek:
       baseURL: https://ark.cn-beijing.volces.com/api/plan/v3
       models:
-        - id: deepseek-v4-flash
+        - id: deepseek-v4.1-flash
           name: DeepSeek V4 Flash(ARK)
         - id: deepseek-v4-pro
           name: DeepSeek V4 Pro(ARK)
       apiKeyEnv: ARK_API_KEY
 agent-default-model:
   provider: vision-toolkit-deepseek-official
-  model: deepseek-v4-flash
+  model: deepseek-v4.1-flash
   reasoningEffort: max
 `;
 writeFileSync(join(tmp, 'settings.yaml'), settings);
@@ -36,7 +36,7 @@ test('readSettingsYaml parses providers and default model', () => {
   assert.ok(parsed.llmProviders.deepseek, 'deepseek provider parsed');
   assert.equal(parsed.llmProviders.deepseek.baseURL, 'https://ark.cn-beijing.volces.com/api/plan/v3');
   assert.equal(parsed.llmProviders.deepseek.apiKeyEnv, 'ARK_API_KEY');
-  assert.ok(parsed.llmProviders.deepseek.models.includes('deepseek-v4-flash'));
+  assert.ok(parsed.llmProviders.deepseek.models.includes('deepseek-v4.1-flash'));
   assert.equal(parsed.agentDefault.provider, 'vision-toolkit-deepseek-official');
   assert.equal(parsed.agentDefault.reasoningEffort, 'max');
 });
@@ -67,11 +67,11 @@ test('enumerateRoutes marks the chat-context selection via requestContext', () =
     ] }),
   };
   // The running session is on the vision-toolkit-deepseek wrapper (Ark + vision).
-  const routes = enumerateRoutes(ctx, { provider: 'vision-toolkit-deepseek', model: 'deepseek-v4-flash', contextWindow: 1000000 });
+  const routes = enumerateRoutes(ctx, { provider: 'vision-toolkit-deepseek', model: 'deepseek-v4.1-flash', contextWindow: 1000000 });
   const wrapped = routes.find((r) => r.provider === 'vision-toolkit-deepseek');
   assert.ok(wrapped, 'vision wrapper appears in the route list (chat model list)');
   assert.equal(wrapped.inUse, true, 'wrapper is the in-use chat model');
-  assert.equal(wrapped.currentModel, 'deepseek-v4-flash');
+  assert.equal(wrapped.currentModel, 'deepseek-v4.1-flash');
   assert.equal(wrapped.vision, true);
   const raw = routes.find((r) => r.provider === 'deepseek');
   assert.equal(raw.inUse, true, 'raw route is also marked when its wrapper is in use');

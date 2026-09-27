@@ -3,7 +3,7 @@
  *
  * Registers a Settings section ("模型路由" / "Model Routes") that mirrors the
  * host-side tools in the GUI:
- *   1. Model routes panel — every route serving deepseek-v4-flash (official /
+ *   1. Model routes panel — every route serving deepseek-v4.1-flash (official /
  *      Ark / custom), key family, default marker, one-click switch of
  *      agent-default-model (+ optional vision wrapper variant).
  *   2. Session handoff entry — export the current session into
@@ -430,7 +430,7 @@ window.__ModuleLoader__.load({
           .finally(function () { setBusyAcp(false); });
       }
 
-      // Fixed recommendation — no per-session computation: deepseek-v4-flash
+      // Fixed recommendation — no per-session computation: deepseek-v4.1-flash
       // is a 1M-window model, so soft 65 / hard 90 is the sane default.
       function recommendAcp() {
         if (busyAcp) return;
@@ -456,7 +456,7 @@ window.__ModuleLoader__.load({
         });
         var BUILTIN_DEFAULTS = {
           "deepseek-official": ["deepseek-chat", "deepseek-reasoner"],
-          "deepseek": ["deepseek-v4-flash"],
+          "deepseek": ["deepseek-v4.1-flash"],
         };
         failoverRows = failoverList.map(function (entry, index) {
           var provider = typeof entry === 'string' ? entry : entry.provider;

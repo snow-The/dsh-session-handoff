@@ -10,7 +10,7 @@ function makeAgent() {
     session: {
       id: 'session-test-9',
       header: { cwd: 'C:/workspace' },
-      requestHeader: () => ({ config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }),
+      requestHeader: () => ({ config: { provider: 'deepseek-official', model: 'deepseek-v4.1-flash' } }),
     },
   };
 }

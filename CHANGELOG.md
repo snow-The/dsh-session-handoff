@@ -475,7 +475,7 @@
   (llm directory + `llm-pi-ai.providers.*` + built-ins, incl. any
   vision-toolkit wrappers) is a first-class route you can order, switch to,
   and fail over to. `model_switch` now preserves the currently selected model
-  instead of forcing `deepseek-v4-flash`. Tool descriptions and panel copy
+  instead of forcing `deepseek-v4.1-flash`. Tool descriptions and panel copy
   are model-agnostic ("registered route").
 - **Failover alternation fixed (real bug caught by the new test).** The
   tried-provider set is now preserved across the error → request → error
@@ -527,7 +527,7 @@
   handler per exact path, so POST fell through to the GET handler. The route
   is now registered once and dispatches on `req.method` internally.
 - **Fixed recommendation (no more computation)**: the "推荐 / Recommend"
-  button fills soft 65 / hard 90 directly (deepseek-v4-flash is a 1M-window
+  button fills soft 65 / hard 90 directly (deepseek-v4.1-flash is a 1M-window
   model); the host `/recommend` route and `acp_recommend` tool remain for
   agent-side use.
 - **Model routes carousel**: the routes list is now one route per slide with
@@ -574,7 +574,7 @@
 
 ## v0.5.0
 
-- Model routes: `model_routes` (every route serving deepseek-v4-flash:
+- Model routes: `model_routes` (every route serving deepseek-v4.1-flash:
   baseURL, key env + family, default marker incl. vision-toolkit- variants,
   vision wrapper) and `model_switch` (persist agent-default-model to a
   route; optional vision:true; missing-key warning).
