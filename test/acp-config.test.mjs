@@ -82,6 +82,46 @@ test('the fuse ceiling is one number: the tool refuses what the UI cannot displa
   await assert.rejects(() => set.execute({ maxContextLimit: '95%' }, {}), /must be 1-90/);
 });
 
+// THE regression test for the class of bug this writer had: `readSection` understood 7 keys and
+// `writeAcpConfig` rewrote 6, so a hand-written `compressTargetRatio` was deleted by the next
+// `acp_set_limit` call and the fold silently went back to 0.35. The invariant is the general one —
+// every key the reader knows must survive a write — because the 7th key will not be the last.
+test('acp_set_limit must not drop any key readSection understands', async () => {
+  writeFileSync(join(tmp, 'settings.yaml'), 'session-handoff:\n  compressTargetRatio: 0.2\n');
+  const keys = Object.keys(readSection('session-handoff:\n'));
+  const tools = [];
+  mod.registerAcpConfigTools({ tools: { register: (t) => tools.push(t) } });
+  const set = tools.find((t) => t.name === 'acp_set_limit');
+  await set.execute({ minContextLimit: '400000' }, {});
+  const text = readFileSync(join(tmp, 'settings.yaml'), 'utf8');
+  for (const key of keys) assert.ok(text.includes(`${key}:`), `the writer dropped ${key} even though readSection still reads it`);
+  assert.equal(readSection(text).compressTargetRatio, 0.2, 'the hand-set deep-fold target survives a write');
+});
+
+test('compressTargetRatio is validated and read back as a number', async () => {
+  assert.equal(mod.validateRatio(0.2), 0.2);
+  assert.equal(mod.validateRatio('0.2'), 0.2);
+  assert.throws(() => mod.validateRatio(0.01), /between 0.05 and 0.9/);
+  assert.throws(() => mod.validateRatio(1), /between 0.05 and 0.9/);
+  assert.throws(() => mod.validateRatio('banana'), /between 0.05 and 0.9/);
+  const parsed = readSection('session-handoff:\n  compressTargetRatio: 0.25\n').compressTargetRatio;
+  assert.equal(parsed, 0.25);
+  assert.equal(typeof parsed, 'number', 'a ratio read back as the string "0.25" is how type bugs start');
+});
+
+test('round-trip: the deep-fold target persists through the tool and shows in both readouts', async () => {
+  writeFileSync(join(tmp, 'settings.yaml'), '');
+  const tools = [];
+  mod.registerAcpConfigTools({ tools: { register: (t) => tools.push(t) } });
+  const set = tools.find((t) => t.name === 'acp_set_limit');
+  const config = tools.find((t) => t.name === 'acp_config');
+  const out = await set.execute({ compressTargetRatio: 0.2 }, {});
+  assert.ok(out.includes('compressTargetRatio: 0.2'), 'the writer reports what it wrote');
+  assert.equal(readSection(readFileSync(join(tmp, 'settings.yaml'), 'utf8')).compressTargetRatio, 0.2);
+  assert.ok((await config.execute({}, {})).includes('compressTargetRatio: 0.2'), 'acp_config must show the value the fold actually uses');
+  await assert.rejects(() => set.execute({ compressTargetRatio: 3 }, {}), /between 0.05 and 0.9/);
+});
+
 test('cleanup', () => {
   rmSync(tmp, { recursive: true, force: true });
 });
