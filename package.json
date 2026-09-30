@@ -22,6 +22,9 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
+    "engines": {
+      "dsh": ">=0.1.5-rc.2 <0.3.0"
+    },
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-locale",
@@ -31,6 +34,9 @@
       ],
       "platform": "web"
     }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
   },
   "keywords": [
     "dsh",

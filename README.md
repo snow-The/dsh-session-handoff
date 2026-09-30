@@ -29,7 +29,7 @@ all progress. This plugin fixes both halves — and more:
 |---|---|
 | `handoff_status` | Compact session overview: turns, messages, tool usage, checkpoints, context pressure |
 | `handoff_export` | Parse the session into a structured Markdown handoff under `<workspace>/.dsh-handoff/` + a ready-to-run **handoff package** (OpenViking archive command, archify diagram command — only when those enhancers are present) |
-| `handoff_resume` | Load the latest handoff document in a fresh session and continue |
+| `handoff_resume` | Load the latest handoff document in a fresh session and continue. "Latest" is by modification time (not by filename), and the output states the document's `exported` timestamp and whether it is the newest — naming an older document explicitly still loads it, with a line saying so |
 
 Also `/handoff` command.
 
@@ -41,12 +41,19 @@ Also `/handoff` command.
 | `acp_compress` | Replace an inclusive surface seq range with your summary (`ctx.compaction.compactRegion`) |
 | `acp_decompress` | Read the original text hidden by a checkpoint (read-only) |
 | `acp_search` | Search visible + hidden compacted history |
-| `acp_config` | Show the active thresholds (soft/hard limits, preserveRecent, minTokens, nudge) |
-| `acp_set_limit` | Persist new thresholds into settings.yaml (new sessions take them) |
+| `acp_config` | Show the active thresholds (soft/hard limits, preserveRecent, minTokens, `compressTargetRatio`, nudge) |
+| `acp_set_limit` | Persist new thresholds into settings.yaml (new sessions take them; the live config is updated at once) |
 
 Plus a system-prompt pressure banner that nudges the model to compress past
 the soft/hard limit (`60%` / `70%` defaults), and a `compaction.summarize`
 interception so model-authored summaries are used.
+
+At the host's hard limit the plugin also writes the project handoff document (Module A) **before** it
+folds, so the readable copy of the session lands in `<workspace>/.dsh-handoff/` at the moment the
+surface is destroyed rather than only when somebody remembers to ask for it. It fires once per level
+(`soft`, then `hard`), is disabled with `handoffOnThreshold: false`, and never blocks the fold.
+⚠️ It writes into the session's working directory — put `.dsh-handoff/` in `.gitignore` when the
+workspace is a repository.
 
 ### Module C — Session management
 

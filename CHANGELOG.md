@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased
+
+- fix(acp-config): **`acp_set_limit` rewrote 6 of the 7 keys `readSection` understands.** A
+  hand-set `compressTargetRatio` was readable, and was silently deleted by the next tool call, so the
+  deep-fold target went back to `0.35` with no error anywhere. The key is now validated
+  (`0.05`–`0.9`), written, applied to the live config, exposed as a tool parameter and printed by
+  `acp_config`. The regression test asserts the general invariant — *every key the reader knows must
+  survive a write* — not the one key, because the seventh key will not be the last.
+- fix(handoff): **`handoff_resume` loaded the wrong document** (#2). `sort().reverse()` is
+  lexicographic and every file shares the `handoff-session-` prefix, so the deciding characters were
+  the hex of a session id: the reporter's workspace loaded the 2026-09-20 handoff while the 2026-09-29
+  one existed, and nothing in the output said so — a stale handoff reads exactly like a fresh one.
+  Selection is now by mtime, the tool prints `exported <ISO>; newest of N documents`, and naming an
+  older document explicitly still loads it *with* a line saying it is not the newest.
+- fix(handoff): **"Recent user objectives" held the FIRST five human messages** (`length < 5` is a
+  prefix, not a suffix), so a handoff written after a long session described where the work started
+  and nothing about where it ended up. The document now carries `Session objective (first human
+  message)` and `Recent user objectives (last 5)` separately.
+- fix(handoff): **the notes block died on re-export.** The export replaces the whole file and that
+  block is the only part a human authored — backwards, since the machine summary is reproducible from
+  the log and the notes are not. The block between `<!-- dsh-handoff:notes -->` and
+  `<!-- /dsh-handoff:notes -->` is now carried across exports; an unedited placeholder is carried as
+  empty rather than echoed forever.
+- fix(handoff): **one owner for the export.** `handoff_export` (file-first event selection),
+  `/handoff` (in-memory events only) and the web route each had their own copy of the write path, so
+  `/handoff` and the GUI button produced a document whose stats were `0` on any already-compacted
+  session. All three now call `exportHandoffForAgent`, which keeps the file-first selection.
+- feat(handoff): **the threshold leaves a durable copy in the project.** The host trigger already
+  folds at the fuse on its own; what it did not do was write anything into the working directory, so
+  after a fold the only readable record was the session log under `DSH_HOME`. The fold hook now
+  exports `.dsh-handoff/handoff-<id>.md` on a level edge (`none → soft → hard`, once each,
+  `handoffWriteDecision`) **before** folding. `handoffOnThreshold: false` disables it; a failed write
+  is logged and cooled down for 5 minutes rather than retried every step, and it never blocks the
+  fold — the fold is the safety net, the document is the record.
+  ⚠️ This writes into the session's working directory: add `.dsh-handoff/` to `.gitignore` when the
+  workspace is a repository.
+- feat(handoff): the document records the ACP budget it was written under
+  (`## Context budget (ACP)`) and says out loud that it is machine-owned and overwritten.
+- chore(package): declare `dsh.engines.dsh` (`>=0.1.5-rc.2 <0.3.0`) and `engines.node`, so the
+  plugin market can show compatibility. **`peerDependencies` deliberately stays empty:**
+  `dsh-app-boot`'s `evaluatePluginCompatibility` only checks `@deepseek-ai/dsh*` peers and skips the
+  check entirely when the field is absent, while adding it invites pnpm's `auto-install-peers` to
+  fetch `@deepseek-ai/*` into the profile's own `node_modules` — where it shadows the host's bundled
+  copies.
+- test: 103/103 (86 before). New: a **wiring** test that boots the plugin and drives `agent/pre-step`
+  (its compaction stub records whether the document already existed *at fold time*), a
+  `handoff_resume` fixture built from issue #2's exact four filenames and mtimes — with one assertion
+  that checks the fixture is still a lexicographic trap, so the file cannot silently stop proving
+  anything — and mutation checks for the writer, the edge trigger and the resume selection.
+
 ## v0.18.2
 
 - fix(graph): `acp_graph build` carried the SAME `session.events` bug as the two metric fields, in its

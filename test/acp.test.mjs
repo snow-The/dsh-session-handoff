@@ -212,6 +212,22 @@ test('a fold that does not shrink the context is a failure, never a no-op', () =
   assert.equal(foldShrank(NaN, 5).ok, false, 'unmeasurable is a failure, not a pass');
 });
 
+// The project-file handoff is written on a LEVEL edge, not on every step. A per-turn writer would
+// put a file write on the hot path of every step for no new information; a missing edge trigger
+// would leave the durable copy unwritten at exactly the moment the fold destroys the surface.
+test('the threshold handoff fires once per level, and never below the soft limit', () => {
+  const { handoffWriteDecision } = __internals;
+  assert.equal(handoffWriteDecision(undefined, 'none'), false, 'nothing to record below the soft limit');
+  assert.equal(handoffWriteDecision(undefined, 'soft'), true, 'first crossing of the soft limit writes');
+  assert.equal(handoffWriteDecision('soft', 'soft'), false, 'staying past the soft limit does not rewrite every step');
+  assert.equal(handoffWriteDecision('soft', 'hard'), true, 'the hard crossing is better informed and rewrites once');
+  assert.equal(handoffWriteDecision('hard', 'hard'), false);
+  assert.equal(handoffWriteDecision('hard', 'none'), false, 'falling back below the limit arms the next level again');
+  assert.equal(handoffWriteDecision(undefined, 'soft', { enabled: false }), false, 'handoffOnThreshold: false is an escape hatch');
+  assert.equal(handoffWriteDecision(undefined, 'bogus'), false, 'an unknown level is not a licence to write');
+  assert.equal(handoffWriteDecision('hard', 'none') === false && handoffWriteDecision('none', 'soft') === true, true, 'none is a level, not a missing value');
+});
+
 test('a host fold never starts at surface node 0 (the system prompt)', () => {
   // Live evidence (2026-09-13): the host trigger DID fire, and the fold it requested was refused
   // with "surface replace: node 0 holds the system prompt and may be rewritten only by a
