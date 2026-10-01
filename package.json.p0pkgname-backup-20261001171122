@@ -61,7 +61,7 @@
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.1",
     "@deepseek-ai/dsh-home-paths": ">=0.2.0-rc.1",
-    "@deepseek-ai/dsh-session-persistence-jsonl": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-session-persistence-jsonl/src/zstd": ">=0.2.0-rc.1",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1"
   }
 }
