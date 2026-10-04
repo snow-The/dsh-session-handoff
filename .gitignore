@@ -1,3 +1,10 @@
 node_modules/
 *.tgz
 .dsh-handoff/
+
+# 工具留下的备份（例如 P0 改名脚本写的 package.json.p0pkgname-backup-<ts>）
+# 注意: .gitignore 不支持行尾注释，规则必须独占一行。
+*.p0pkgname-backup-*
+*.bak-*
+# 提交消息临时文件（用通配覆盖所有变体）
+.*commit-msg*

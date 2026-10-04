@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.18.14
+
+- fix(services): **service access is now actually defensive**. The pattern
+
+      const webServer = ctx.get?.('webServer') ?? ctx.webServer;
+
+  is not defensive: in cordis, reading a service property that is not registered **throws**
+  (`cannot get property "webServer" without inject`) rather than yielding `undefined`, so the
+  `??` fallback is the thing that explodes and the `ctx.get` on the left never gets to help.
+
+  Two consequences, both real:
+  - A profile **without a webServer service** (headless / tui) would fail to load this plugin
+    entirely — losing ACP, handoff and model routes, not just the HTTP routes.
+  - When the web server fails to start, this plugin reported
+    `cannot get property "webServer" without inject` while 14 sibling plugins reported a clean
+    "waiting for services". The error named neither the plugin's fault nor the real cause.
+
+  Found on 2026-10-04 while deploying to a laptop, where an unrelated misconfiguration stopped
+  the web server and this plugin was the only one that crashed instead of waiting.
+- `lib/services.js` (new): `serviceOf(ctx, name)` returns the service or `null`, never throws.
+  Also `methodOf(obj, method)` for the separate "object present, method absent" hazard that
+  `lib/session-mgmt.js` documents.
+- `lib/index.js`, `lib/session-mgmt.js`: all opportunistic service reads go through `serviceOf`.
+- test/service-access.test.mjs (new): every `ctx.<name>` in `lib/` must be either declared in
+  `export const inject` or are a cordis builtin; anything else must use `serviceOf`. Comments are
+  stripped first, so documentation examples do not trip it. Mutation-checked: re-adding
+  `ctx.webServer` fails the suite and names the line.
+- test: 124/124.
+
+
 ## v0.18.13
 
 - feat(format): the document layer now speaks **session format V4 as well as V3**. DSH 0.1.7-rc.2 moved
