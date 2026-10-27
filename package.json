@@ -33,9 +33,10 @@
       "dshReleases": [
         "0.2.0-rc.1",
         "0.2.0-rc.2",
-        "0.2.1-rc.2"
+        "0.2.1-rc.2",
+        "0.2.1-rc.3"
       ],
-      "verifiedAgainst": "0.2.1-rc.2"
+      "verifiedAgainst": "0.2.1-rc.3"
     }
   },
   "keywords": [
