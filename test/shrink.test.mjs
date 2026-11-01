@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cutText, isShrunkContent, partsText, hasNonTextParts, shrinkTargets, shrunkenContent, toolResultOf, withResultParts,
+  safeCutIndex, tailText, truncateText,
 } from '../lib/shrink.js';
 
 /** V3: role 'user', one tool-result wrapper holding the parts. */
@@ -108,4 +109,78 @@ test('the guards read the parts, not their label', () => {
   assert.equal(hasNonTextParts([{ type: 'text', text: 'a' }]), false);
   assert.equal(hasNonTextParts([{ type: 'text', text: 'a' }, { type: 'image', attachment: 'x' }]), true, 'an image is never silently dropped');
   assert.equal(isShrunkContent([{ type: 'text', text: 'plain' }]), false);
+});
+
+// ---------------------------------------------------------------------------------------------
+// 码点安全截断（2026-11-02）
+//
+// 事故：`~/.dsh/sessions` 全量 456 档 / 1,127,335 行里查出 18 处**孤立 UTF-16 代理对**，
+// 每一个都来自本文件/调用方的 `slice(0, N)`：切点刚好落在一个 emoji 的两个码元之间，
+// 头以孤立高位代理结尾。那串字随后被写进会话日志、再进请求载荷 —— provider 以
+// **不可重试的 400** 拒绝，而坏值留在历史里，那条会话就再也恢复不了。
+//
+// 下面用**穷举**而不是挑几个点：任何一个切点都不许劈开代理对。
+// ---------------------------------------------------------------------------------------------
+
+// 每个字符都可能是代理对的字符串：中文、emoji(2 码元)、BMP 标点、组合序列
+const MIXED = '評估完成 ✅ 完整報告：\n\n## 🗺 地图\n| 表格 | 🏠 首頁 |\n🧭🧭 tail';
+
+test('safeCutIndex never lands between a surrogate pair (every index)', () => {
+  for (let i = 0; i <= MIXED.length; i++) {
+    const cut = safeCutIndex(MIXED, i);
+    const head = MIXED.slice(0, cut);
+    assert.equal(head.isWellFormed(), true, `cut at ${i} produced a lone surrogate in the head`);
+    // 它只允许「退一格」，不许乱跳
+    assert.ok(i - cut === 0 || i - cut === 1, `cut at ${i} moved by ${i - cut}`);
+  }
+});
+
+test('truncateText is well-formed for EVERY budget, and respects budget-1', () => {
+  for (let n = 0; n <= MIXED.length; n++) {
+    const out = truncateText(MIXED, n);
+    assert.equal(out.isWellFormed(), true, `budget ${n} produced a lone surrogate`);
+    assert.ok(out.length <= n, `budget ${n} returned ${out.length} chars`);
+    // 只在确实劈开一对时才少一个码元；否则必须用满预算
+    const full = MIXED.slice(0, n);
+    assert.ok(out.length === n || out.length === n - 1, `budget ${n} returned ${out.length} chars`);
+    assert.equal(out.length === n, full.isWellFormed(), `budget ${n}: shrank a well-formed cut`);
+  }
+});
+
+test('tailText is well-formed for EVERY keep length', () => {
+  for (let n = 0; n <= MIXED.length + 2; n++) {
+    const out = tailText(MIXED, n);
+    assert.equal(out.isWellFormed(), true, `keep ${n} produced a lone surrogate`);
+    assert.ok(out.length <= n, `keep ${n} returned ${out.length} chars`);
+  }
+});
+
+test('cutText head and tail are BOTH well-formed for every head/tail pair', () => {
+  for (let head = 0; head <= 12; head++) {
+    for (let tail = 0; tail <= 12; tail++) {
+      const cut = cutText(MIXED, { headChars: head, tailChars: tail });
+      assert.equal(cut.head.isWellFormed(), true, `head ${head}/tail ${tail}: head split a pair`);
+      assert.equal(cut.tail.isWellFormed(), true, `head ${head}/tail ${tail}: tail split a pair`);
+    }
+  }
+});
+
+test('the real-world hit: a 72-char preview of a message ending in "## 🗺"', () => {
+  // 现场原文（session db5fe294 seq 152535 的 surface 预览）。72 正好切在 🗺 的两个码元之间。
+  const line = '評估完成 ✅ 完整報告存於 `kb/docs/research/06-model-evaluation.adoc`。以下是核心結論：\n\n## 🗺 內容';
+  const legacy = line.slice(0, 72);           // 旧行为：切开了代理对
+  assert.equal(legacy.isWellFormed(), false, 'this fixture must reproduce the bug');
+  const fixed = truncateText(line, 72);
+  assert.equal(fixed.isWellFormed(), true);
+  assert.equal(fixed.length, 71, 'it drops exactly the orphaned high surrogate');
+});
+
+test('shrunkenContent never writes a lone surrogate back into the transcript', () => {
+  // 这条最要命：cutText 的输出会被 withResultParts 写回会话日志，坏值从此留在历史里。
+  const long = 'x'.repeat(1199) + '🧭' + 'y'.repeat(400);
+  assert.equal(long.slice(0, 1200).isWellFormed(), false, 'this fixture must reproduce the bug');
+  const parts = shrunkenContent([{ type: 'text', text: long }], { seq: 1, toolName: 'run_code', headChars: 1200, tailChars: 400 });
+  assert.notEqual(parts, null);
+  const text = partsText(parts);
+  assert.equal(text.isWellFormed(), true);
 });

@@ -1,5 +1,61 @@
 # Changelog
 
+## v0.18.16
+
+### fix: preview cuts could split a surrogate pair and brick a session
+
+`s.slice(0, n)` counts **UTF-16 code units**, not characters. An emoji is two code
+units, so a cut that lands between them leaves the head ending in a **lone high
+surrogate** (U+D800..DBFF) and the tail starting with a **lone low surrogate**
+(U+DC00..DFFF).
+
+That is not a cosmetic bug:
+
+- a lone surrogate in a request payload is rejected by the provider with a
+  **non-retryable 400**, and
+- the bad string has already been written to the session log, so every resume
+  re-sends it and that session never runs again.
+
+Measured 2026-11-02 over the whole `~/.dsh/sessions` corpus — **456 archives /
+1,127,335 lines → 18 lone surrogates**, every one of them from this code path:
+
+- `lib/index.js` — the surface map's **72-char preview** (`preview: …slice(0, 72)`).
+  Real hit: `…以下是核心結論：\n\n## <U+D83D>` — 72 fell exactly inside `🗺`.
+- `lib/shrink.js` — **`cutText`'s head/tail cut**, which is worse: its output is
+  written **back into the transcript** by `withResultParts`.
+- plus the other event-preview sites (300 / 200 / 160 / 120 chars) and
+  `lib/graph.js`'s 300-char checkpoint summary.
+
+Fixed by three helpers in `lib/shrink.js`, used at every preview site:
+
+```js
+safeCutIndex(text, index) // step back one if the cut would split a pair
+truncateText(text, n)     // head, never ends on a lone high surrogate
+tailText(text, keep)      // tail, never starts on a lone low surrogate
+```
+
+`truncateText` drops exactly one code unit (and only when it must), so budgets
+still mean what they say.
+
+Tests are **exhaustive, not sampled**: every cut index of a mixed CJK+emoji
+string, every head/tail pair, plus the real-world fixture above asserted to fail
+on the old code and pass on the new one (`test/shrink.test.mjs`, 13 tests, suite
+142/142).
+
+Detecting it afterwards is the other half, and it lives outside this package:
+`~/.dsh/_p0/surrogate-scan.mjs` streams every session archive through `zstd`,
+reports the offending code point **and its position** (末尾 = an odd-byte
+`utf16le` decode; 中间 = a code-unit cut; 开头 = the head was cut), and is gate #7
+of `verify-all.mjs` with a **differential baseline** — known historical hits are
+advisory, a new one means the producer is still leaking.
+
+Note this must not be "fixed" by re-patching the host: patching files inside the
+global `@deepseek-ai/dsh` install is silently discarded by the next
+`npm i -g`, which is exactly how the earlier `wellformed-utf16` patch
+disappeared. Verified 2026-11-02: rc.5 has **no** well-formed-UTF-16 guard
+anywhere in the message path (`isWellFormed` appears only in the devtools
+lighthouse worker, `dsh-hmr`, and `undici`).
+
 ## v0.18.14
 
 - fix(services): **service access is now actually defensive**. The pattern
