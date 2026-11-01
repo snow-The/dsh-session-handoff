@@ -31,12 +31,9 @@
     },
     "compatibility": {
       "dshReleases": [
-        "0.2.0-rc.1",
-        "0.2.0-rc.2",
-        "0.2.1-rc.2",
-        "0.2.1-rc.3"
+        "0.2.1-rc.5"
       ],
-      "verifiedAgainst": "0.2.1-rc.3"
+      "verifiedAgainst": "0.2.1-rc.5"
     }
   },
   "keywords": [
@@ -60,12 +57,12 @@
     "fuzz": "node test/fuzz-reader.mjs --iters=400"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1",
-    "@deepseek-ai/dsh-home-paths": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh": ">=0.2.1-rc.5",
+    "@deepseek-ai/dsh-home-paths": ">=0.2.1-rc.5",
     "@deepseek-ai/dsh-session-persistence-jsonl": ">=0.2.0-rc.1",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1"
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.5"
   },
   "engines": {
-    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+    "dsh": ">=0.2.1-rc.5"
   }
 }
