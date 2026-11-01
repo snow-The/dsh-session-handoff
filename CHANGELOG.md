@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.17
+
+- 修：`lib/index.js` 引用的 `lib/moderation.js` 之前**没有提交**（本机在磁盘上所以自测全绿，从 GitHub 装的每一次都在 import 时就失败）。发布口径从此以 `git archive HEAD` 为准，不以 `npm pack`（后者打的是工作区，会把未跟踪文件一起带走）。
+
 ## v0.18.16
 
 ### fix: preview cuts could split a surrogate pair and brick a session
