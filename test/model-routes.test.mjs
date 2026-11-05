@@ -105,6 +105,37 @@ test('a live route that settings.yaml does not describe is still registered', ()
   assert.equal(ds.registered, true);
 });
 
+test('switch report tells the truth about where the write lands, and prints the pasteable row', () => {
+  const { formatSwitchReport, patchRowFor } = mod;
+  const route = { baseURL: 'https://api.commandcode.ai', keyEnv: 'COMMANDCODE_API_KEY', keyFamily: 'stored' };
+  const text = formatSwitchReport({
+    provider: 'commandcode',
+    model: 'deepseek/deepseek-v4.1-flash',
+    reasoningEffort: 'max',
+    route,
+  });
+  // 旧文案是谎：当前 DSH 不读 settings.yaml 的这一节
+  assert.ok(!/takes effect for new sessions/.test(text), 'must not claim the switch takes effect');
+  assert.match(text, /不会改变默认模型/);
+  assert.match(text, /settings\.yaml/);
+  // 必须给出可直接粘贴进 profile patch 的行
+  assert.match(text, /- id: agent-default-model/);
+  assert.match(text, /provider: commandcode/);
+  assert.match(text, /model: deepseek\/deepseek-v4\.1-flash/);
+  assert.match(text, /reasoningEffort: max/);
+  assert.equal(
+    patchRowFor({ provider: 'x', model: 'y', reasoningEffort: 'high' }),
+    [
+      '- id: agent-default-model',
+      "  name: '@deepseek-ai/dsh-agent-default-model'",
+      '  config:',
+      '    provider: x',
+      '    model: y',
+      '    reasoningEffort: high',
+    ].join('\n'),
+  );
+});
+
 test('cleanup', () => {
   rmSync(tmp, { recursive: true, force: true });
 });
