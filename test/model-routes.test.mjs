@@ -77,6 +77,34 @@ test('enumerateRoutes marks the chat-context selection via requestContext', () =
   assert.equal(raw.inUse, true, 'raw route is also marked when its wrapper is in use');
 });
 
+test('a live route that settings.yaml does not describe is still registered', () => {
+  const { enumerateRoutes } = mod;
+  // 这正是假红的形状：commandcode 这类路由来自 profile patch 行，
+  // settings.yaml 里**没有**它的 llm-pi-ai 块，但宿主 llm 目录里有它的 adapter。
+  // 旧实现只看 settings.yaml 的 models 列表，于是「列得出来 + 判成未注册」。
+  const ctx = {
+    get: () => ({
+      listProviders: () => [
+        { id: 'commandcode', name: 'Command Code' },
+        { id: 'deepseek', name: 'DeepSeek (ARK)' },
+      ],
+    }),
+  };
+  const routes = enumerateRoutes(ctx);
+
+  const cc = routes.find((r) => r.provider === 'commandcode');
+  assert.ok(cc, 'live route must be listed');
+  assert.equal(cc.registered, true, 'live registration IS registration');
+  assert.equal(cc.source, 'live');
+  // 「看不到钥匙」不得冒充「没有钥匙」：provider 没申报 apiKeyEnv 时是 undeclared
+  assert.equal(cc.keyState, 'undeclared');
+  assert.notEqual(cc.keyFamily, '(missing)');
+
+  const ds = routes.find((r) => r.provider === 'deepseek');
+  assert.equal(ds.keyEnv, 'ARK_API_KEY', 'settings still supplies the key ref');
+  assert.equal(ds.registered, true);
+});
+
 test('cleanup', () => {
   rmSync(tmp, { recursive: true, force: true });
 });
