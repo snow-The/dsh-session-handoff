@@ -33,11 +33,11 @@
 - client 端 inject：`['slots', 'locale', 'connection', 'sessions', 'workspaces']`（照 dsh-session-manager）
 - 设置页分栏：`ctx.slots.register('settings.section', ...)`（照 dsh-session-manager 的 NAV_ZH/NAV_EN + locale namespace）
 - 模型路由数据：host 已有 enumerateRoutes 纯逻辑——client 可通过 host HTTP 路由暴露（照 dsh-session-manager 的 `contract.ts` 路由模式：DELETE_ROUTE/TRASH_ROUTE 等），或加一个 GET /dsh-session-handoff/routes 路由
-- 切换动作：client 调 host 路由 → host 写 settings.yaml（复用 model-routes.js 的写逻辑）
+- 切换动作：client 调 host 路由 → host 通过 configEditor 写 profile patch（复用 model-routes.js 的写逻辑；settings.yaml 已不是配置面）
 - 注意：session-handoff 是纯 host 插件现在，加 client 后要重新 pnpm install + 重启生效
 
 ## 验证
 
 - 装好后 GUI 设置页出现「模型路由」分栏
-- 一键切换官方/Ark，settings.yaml 的 agent-default-model 随之变化
+- 一键切换官方/Ark，profile patch 的 agent-default-model 随之变化（写后读回校验）
 - 其余 25 个 host 测试不回归

@@ -52,7 +52,7 @@ window.__ModuleLoader__.load({
       "routes.vision": "视觉变体",
       "routes.switch": "设为默认",
       "routes.switching": "切换中…",
-      "routes.switched": "已切换到 {provider}（新会话生效）",
+      "routes.switched": "已切换到 {provider}（已写入 profile 配置）",
       "routes.switchFailed": "切换失败：{error}",
       "routes.builtin": "内置路由",
       "routes.configured": "已配置路由",
@@ -109,7 +109,7 @@ window.__ModuleLoader__.load({
       "routes.vision": "vision variant",
       "routes.switch": "Set default",
       "routes.switching": "Switching…",
-      "routes.switched": "Switched to {provider} (new sessions)",
+      "routes.switched": "Switched to {provider} (profile config written)",
       "routes.switchFailed": "Switch failed: {error}",
       "routes.builtin": "built-in route",
       "routes.configured": "configured route",
@@ -364,9 +364,10 @@ window.__ModuleLoader__.load({
             if (result && result.ok === true) {
               setMessage(t("routes.switched", { provider: result.provider }));
               setMessageError(false);
-              setRoutes((routes.map(function (r) {
-                return Object.assign({}, r, { default: r.provider === route.provider });
-              })));
+              // Refetch instead of copying the intent into the list: the switch
+              // now really writes the profile patch, so the server's reply is
+              // the truth about which route is the default.
+              load();
             } else {
               setMessage(t("routes.switchFailed", { error: result && result.error ? result.error : "unknown" }));
               setMessageError(true);

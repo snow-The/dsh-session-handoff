@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.18.20
+
+### fix: `model_switch` 现在真的会换模型（以前写的是一个没人读的文件）
+
+三个事实叠在一起，就是「设置会跑掉」：
+
+1. `agent-default-model` 只读 `this.config.provider.get()` —— 它自己的插件 config，**从不读** `$DSH_HOME/settings.yaml`。
+2. `settings.yaml` 在当前 DSH 是**已移除**的面：只剩 `dsh-settings` 的迁移路径（"removed / move into the active profile"），而且 `~/.dsh` 下根本没有这个文件。
+3. 所以旧 `model_switch` 写的每一行都落空，`model_routes` 的 `*`（默认标记）也一样从 settings.yaml 取 ⇒ **一个默认都没标记**，看起来就像默认模型不见了。
+
+现在：
+
+- 写动作交给文件的主人：`ctx.configEditor.edit(entry, change)` —— profile 锁（`withFileLock` 在 profile 的 package.json 上）+ `yaml.parseDocument` 文档级编辑 + 原子写 + Loader 对账 + 失败回滚。我们不再自己实现锁、不再拼文本、不再有第二个写者。
+- 写完**读回** live config 校验；对不上就抛错（含 desired vs live 与 patch 路径），不会出现打勾假的成功。
+- `default` 标记改由 live config 得出；settings.yaml 的读取全部删除（`readSettingsYaml`/`settingsPath` 移除，连带那段正则 YAML 解析器）。
+- 两个宿主内建路由（`deepseek` = Ark、`deepseek-official` = 官方 API）在 adapter 不自报 `baseURL`/`apiKeyEnv` 时用内建表补全 —— adapter 的值为准，且**其他**路由绝不借这两条的身份。
+- client：切换成功文案去掉「新会话生效」，改成「已写入 profile 配置」；成功后重新拉 `/routes`，而不是在本地把 `default` 改成用户想要的样子。
+
+实测（冷启第二个宿主 `--port 3199`，同一 profile）：`POST /dsh-session-handoff/switch {"provider":"deepseek-official"}` → 返回新的 provider/model/effort + `patchPath`，`cordis.patch.yml:76` 真的变成 `provider: deepseek-official`；再切回 `commandcode`，与切换前备份**逐字节一致**（`diff` 无输出）。151 测试全绿。
+
 ## 0.18.17
 
 - 修：`lib/index.js` 引用的 `lib/moderation.js` 之前**没有提交**（本机在磁盘上所以自测全绿，从 GitHub 装的每一次都在 import 时就失败）。发布口径从此以 `git archive HEAD` 为准，不以 `npm pack`（后者打的是工作区，会把未跟踪文件一起带走）。
