@@ -1,15 +1,15 @@
-// Degenerate repetition: the detector must fire on the live sample and NOT on real work.
+// Known-stutter detection: fire on the measured deepseek-v4.1-flash format, never on real work.
 //
-// The positive sample is the exact text the user pasted from a stuck session on 2026-11-21. The
-// negative samples are real shapes a coding agent produces every day — a repeated statement, a
-// closing-tag block, a markdown rule, a base64 blob, a table. A detector that fires on those is
-// worse than none, because it aborts work that was going fine.
+// The positive sample is the exact text the user pasted from a stuck session on 2026-11-21.
+// The negatives are real shapes a coding agent produces every day. The guarantee this file pins
+// is narrow on purpose: the detector fires only when EVERY non-empty line is a known filler
+// phrase, so a single line of real content is enough to keep the stream alive.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { detectRepetition, RepetitionGuard, DEFAULTS } = await import('../lib/repetition.js');
+const { detectRepetition, RepetitionGuard, KNOWN_STUTTERS, DEFAULTS } = await import('../lib/repetition.js');
 
-/** The live failure, verbatim (the user pasted it twice; this is one cycle plus its repeat). */
+/** The live failure, verbatim. */
 const LIVE = `OK.
 
 Let me write.
@@ -34,23 +34,40 @@ Let me go.
 test('the live degenerate sample is detected', () => {
   const v = detectRepetition(LIVE);
   assert.equal(v.degenerate, true, `expected degenerate, got ${JSON.stringify(v)}`);
-  // The detector reports the SHAPE it found, and the live sample is caught by the line test
-  // (4 distinct lines out of 10), not by a cycle count — the pasted text is only 1.98 cycles,
-  // so a repeats-based assertion would be asserting the wrong mechanism.
-  assert.ok(v.distinctRatio <= DEFAULTS.maxDistinctRatio,
-    `distinctRatio ${v.distinctRatio} above ${DEFAULTS.maxDistinctRatio}`);
-  assert.ok(v.meanLineChars <= DEFAULTS.maxMeanLineChars,
-    `meanLineChars ${v.meanLineChars} above ${DEFAULTS.maxMeanLineChars}`);
+  assert.equal(v.lines, 10);
+  assert.equal(v.matched, 10, 'every line must be a known phrase');
 });
 
 test('a longer run of the same stutter is still detected', () => {
   const v = detectRepetition(LIVE.repeat(4));
   assert.equal(v.degenerate, true);
-  // More repeats of the same four lines means a LOWER distinct ratio, not a higher one.
-  assert.ok(v.distinctRatio < 0.2, `expected a low distinct ratio, got ${v.distinctRatio}`);
+  assert.equal(v.lines, 40);
+});
+
+test('the phrase set is data, so a new model version is a new entry, not a new algorithm', () => {
+  assert.deepEqual(KNOWN_STUTTERS['deepseek-v4.1-flash'], ['OK.', 'Let me write.', 'Let me go.', 'Writing.']);
+  // A model whose set is not registered is NOT judged — the detector says so instead of guessing.
+  const v = detectRepetition(LIVE, { model: 'some-future-model' });
+  assert.equal(v.degenerate, false);
+  assert.match(v.reason, /no known phrase set/);
+});
+
+test('an unregistered model can be covered by passing its phrases', () => {
+  const v = detectRepetition('Hmm.\n\nLet me think.\n\nHmm.\n\nLet me think.\n', {
+    model: 'some-future-model',
+    phrases: ['Hmm.', 'Let me think.'],
+  });
+  assert.equal(v.degenerate, true);
 });
 
 // --- negatives: real work must never be aborted ------------------------------------------------
+
+test('ONE line of real content is enough to keep the stream alive', () => {
+  // This is the whole safety property: the detector requires EVERY line to be a known phrase.
+  const mixed = LIVE + '\nThe compaction threshold was read from the wrong section.\n';
+  const v = detectRepetition(mixed);
+  assert.equal(v.degenerate, false, `false positive when real content is present: ${JSON.stringify(v)}`);
+});
 
 test('a repeated statement in real code is NOT degenerate', () => {
   const code = [
@@ -77,7 +94,6 @@ test('a markdown rule and a separator table are NOT degenerate', () => {
 });
 
 test('a base64 blob is NOT degenerate', () => {
-  // Deterministic pseudo-random base64: high entropy, no short cycle.
   let s = '';
   let x = 12345;
   for (let i = 0; i < 600; i++) {
@@ -88,8 +104,7 @@ test('a base64 blob is NOT degenerate', () => {
   assert.equal(v.degenerate, false, `false positive on base64: ${JSON.stringify(v)}`);
 });
 
-test('a long answer that quotes the stutter ONCE is NOT degenerate', () => {
-  // The phrase appears, but it is not the answer — coverage must stay below the bar.
+test('a long answer that QUOTES the stutter is NOT degenerate', () => {
   const answer = 'Here is what I found. OK. Let me write. Let me go. Writing. Let me go.\n\n'
     + 'The actual finding is that the compaction threshold was read from the wrong section, '
     + 'so the soft limit never fired and the session grew until the provider rejected it. '
@@ -102,19 +117,15 @@ test('a long answer that quotes the stutter ONCE is NOT degenerate', () => {
 test('short output is never judged', () => {
   const v = detectRepetition('OK. Let me go.');
   assert.equal(v.degenerate, false);
-  assert.equal(v.reason, 'too-short');
+  assert.equal(v.reason, 'too-few-lines');
 });
 
 // --- the streaming wrapper --------------------------------------------------------------------
 
 test('the guard fires mid-stream, not only at the end', () => {
-  // The line-based test needs `minLines` content lines before it can judge, so the guard cannot
-  // fire on the first delta — that is correct, not a bug. What matters is that it fires BEFORE
-  // the stream ends, i.e. while there is still text left to suppress.
-  //
-  // Measured trace (probe-guard.mjs): checks at 20/40/60/80/100 chars, fires at 100 of 107. The
-  // first version asserted `at < LIVE.length - 20`, which demanded firing by char 87 — earlier
-  // than the detector can possibly have 6 content lines. The assertion was wrong, not the guard.
+  // The detector needs `minLines` (4) before it can judge, so it cannot fire on the first delta —
+  // that is correct. What matters is that it fires BEFORE the stream ends, while there is still
+  // text left to suppress.
   const g = new RepetitionGuard({ checkEveryChars: 20 });
   let fired = null;
   for (let i = 0; i < LIVE.length; i += 10) {
