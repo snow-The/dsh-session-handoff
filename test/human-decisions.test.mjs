@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { extractHumanDecisions, hasDecisionMarker, DECISION_MARKERS, HUMAN_SOURCE_KINDS } from '../lib/human-decisions.js'
+import { extractHumanDecisions, hasDecisionMarker, DECISION_MARKERS, HUMAN_SOURCE_KINDS, renderHumanDecisions } from '../lib/human-decisions.js'
 
 const human = (seq, text, extra = {}) => ({
   type: 'user/message',
@@ -181,4 +181,88 @@ test('HUMAN_SOURCE_KINDS 是匯出的常數', () => {
   assert.ok(Array.isArray(HUMAN_SOURCE_KINDS))
   assert.ok(HUMAN_SOURCE_KINDS.includes('user'))
   assert.ok(HUMAN_SOURCE_KINDS.includes('acp-human-decisions'))
+})
+
+// renderHumanDecisions 的選擇策略
+//
+// 第一版按 seq 順序塞到 maxChars 滿為止。實測（_p0/measure-cap-coverage.mjs，6 個 session、
+// 1,934 則真人訊息）：8000 上限只保住 127 / 1,613 = 7.9%，92.1% 被丟掉。
+// 上限保護了成本，卻讓保護本身失效。
+//
+// 現在改成「決策訊息全保 + 其餘按新到舊填」。
+const rec = (seq, text, decision = false) => ({
+  seq,
+  turn: null,
+  time: 1000 + seq,
+  chars: text.length,
+  text,
+  decision,
+  before: { lastAssistantSeq: null, lastToolSeq: null },
+  after: { firstAssistantSeq: null },
+})
+
+test('render: 決策訊息優先於非決策訊息', () => {
+  const records = [rec(1, '普通訊息一'), rec(2, '你應該用 npx', true), rec(3, '普通訊息二')]
+  const out = renderHumanDecisions(records, { maxChars: 0 })
+  const decisionAt = out.indexOf('你應該用 npx')
+  const plainAt = out.indexOf('普通訊息一')
+  assert.ok(decisionAt >= 0 && plainAt >= 0)
+  assert.ok(decisionAt < plainAt, '決策訊息必須排在前面')
+})
+
+test('render: 非決策訊息按「新到舊」排，不是按 seq', () => {
+  const records = [rec(1, '最舊的'), rec(2, '中間的'), rec(3, '最新的')]
+  const out = renderHumanDecisions(records, { maxChars: 0 })
+  const newest = out.indexOf('最新的')
+  const oldest = out.indexOf('最舊的')
+  assert.ok(newest >= 0 && oldest >= 0)
+  assert.ok(newest < oldest, '預算該先給最新的訊息')
+})
+
+test('render: 上限吃緊時，決策訊息仍全部保留', () => {
+  // 10 則決策訊息 + 100 則普通訊息，上限只夠放決策的
+  const records = []
+  for (let i = 1; i <= 10; i++) records.push(rec(i, `決策 ${i}：應該這樣做`, true))
+  for (let i = 11; i <= 110; i++) records.push(rec(i, `普通訊息 ${i}`))
+  const out = renderHumanDecisions(records, { maxChars: 2000 })
+  for (let i = 1; i <= 10; i++) {
+    assert.ok(out.includes(`決策 ${i}`), `決策 ${i} 必須在區塊裡`)
+  }
+})
+
+test('render: 上限吃緊時，保留的是最新的普通訊息', () => {
+  const records = []
+  for (let i = 1; i <= 200; i++) records.push(rec(i, `訊息 ${i} ${'x'.repeat(50)}`))
+  const out = renderHumanDecisions(records, { maxChars: 3000 })
+  assert.ok(out.includes('訊息 200'), '最新的必須保留')
+  assert.ok(!out.includes('訊息 1 '), '最舊的該被丟掉')
+})
+
+test('render: 有東西被丟時，明講丟了幾則', () => {
+  const records = []
+  for (let i = 1; i <= 200; i++) records.push(rec(i, `訊息 ${i} ${'x'.repeat(50)}`))
+  const out = renderHumanDecisions(records, { maxChars: 2000 })
+  assert.match(out, /more human message\(s\) omitted by the size cap/)
+  assert.match(out, /remain in the session log/)
+})
+
+test('render: 被丟的決策訊息要單獨報數', () => {
+  // 決策訊息多到放不下
+  const records = []
+  for (let i = 1; i <= 100; i++) records.push(rec(i, `決策 ${i} ${'y'.repeat(100)}`, true))
+  const out = renderHumanDecisions(records, { maxChars: 2000 })
+  assert.match(out, /decision-bearing/, '必須說明有多少決策訊息被丟')
+})
+
+test('render: maxChars 0 表示無上限', () => {
+  const records = []
+  for (let i = 1; i <= 100; i++) records.push(rec(i, `訊息 ${i} ${'x'.repeat(100)}`))
+  const out = renderHumanDecisions(records, { maxChars: 0 })
+  assert.ok(!out.includes('omitted'), '無上限時不該有省略說明')
+  assert.ok(out.includes('訊息 1 '), '無上限時最舊的也在')
+})
+
+test('render: 空陣列回空字串', () => {
+  assert.equal(renderHumanDecisions([], { maxChars: 8000 }), '')
+  assert.equal(renderHumanDecisions(null), '')
 })
