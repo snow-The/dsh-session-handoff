@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { extractHumanDecisions, hasDecisionMarker, DECISION_MARKERS } from '../lib/human-decisions.js'
+import { extractHumanDecisions, hasDecisionMarker, DECISION_MARKERS, HUMAN_SOURCE_KINDS } from '../lib/human-decisions.js'
 
 const human = (seq, text, extra = {}) => ({
   type: 'user/message',
@@ -147,4 +147,38 @@ test('抽取結果帶 decision 旗標', () => {
   const out = extractHumanDecisions(events, { start: 1, end: 2 })
   assert.equal(out[0].decision, false)
   assert.equal(out[1].decision, true)
+})
+
+// 跨折疊的保護：我們自己注入的區塊不能被下一次折疊吃掉
+const injectedByUs = (seq, text) => ({
+  type: 'user/message',
+  seq,
+  time: 1000 + seq,
+  data: { source: { kind: 'acp-human-decisions' }, content: text },
+})
+
+test('跨折疊：acp-human-decisions 也算真人訊息，不會被下一次折疊吃掉', () => {
+  const events = [injectedByUs(1, '## Human messages in the folded range (verbatim)\n\n- **seq 8** ...')]
+  const out = extractHumanDecisions(events, { start: 1, end: 1 })
+  assert.equal(out.length, 1, '我們自己注入的區塊必須被再抽一次，否則保護只維持一次折疊')
+})
+
+test('跨折疊：重複的內容只保留一次（不累積）', () => {
+  const body = '- **seq 8** **[decision]**\n  > 你應該用 npx 而不是 pnpm'
+  const events = [human(1, '你應該用 npx 而不是 pnpm'), injectedByUs(2, body)]
+  const out = extractHumanDecisions(events, { start: 1, end: 2 })
+  // 兩者內容重疊，去重後只留一筆
+  assert.equal(out.length, 1, '同一段話不該因為被注入過就變成兩筆')
+})
+
+test('跨折疊：不同內容都保留', () => {
+  const events = [human(1, '第一句話'), injectedByUs(2, '第二句話')]
+  const out = extractHumanDecisions(events, { start: 1, end: 2 })
+  assert.equal(out.length, 2)
+})
+
+test('HUMAN_SOURCE_KINDS 是匯出的常數', () => {
+  assert.ok(Array.isArray(HUMAN_SOURCE_KINDS))
+  assert.ok(HUMAN_SOURCE_KINDS.includes('user'))
+  assert.ok(HUMAN_SOURCE_KINDS.includes('acp-human-decisions'))
 })
