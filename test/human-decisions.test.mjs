@@ -78,10 +78,22 @@ test('沒有 before/after 時是 null，不是 undefined', () => {
 })
 
 test('保留 turn 與 time', () => {
+  // `user/message` does NOT carry a turn field (measured 0 of 352 across 20 sessions), so the turn
+  // is derived from the preceding `turn/start`. The old version of this test put `turn: 7` on the
+  // message itself, which is a shape production never produces.
+  const events = [
+    { type: 'turn/start', seq: 1, time: 1000, data: { turn: 7 } },
+    human(2, 'x'),
+  ]
+  const out = extractHumanDecisions(events, { start: 1, end: 2 })
+  assert.equal(out[0].turn, 7)
+  assert.equal(out[0].time, 1002)
+})
+
+test('user/message 自己帶的 turn 欄位不被採用（production 從不產生它）', () => {
   const events = [{ ...human(1, 'x'), turn: 7 }]
   const out = extractHumanDecisions(events, { start: 1, end: 1 })
-  assert.equal(out[0].turn, 7)
-  assert.equal(out[0].time, 1001)
+  assert.equal(out[0].turn, null)
 })
 
 test('空文字或只有空白的訊息跳過', () => {
@@ -242,7 +254,10 @@ test('render: 有東西被丟時，明講丟了幾則', () => {
   const records = []
   for (let i = 1; i <= 200; i++) records.push(rec(i, `訊息 ${i} ${'x'.repeat(50)}`))
   const out = renderHumanDecisions(records, { maxChars: 2000 })
-  assert.match(out, /more human message\(s\) omitted by the size cap/)
+  // The unit is now a TURN, not a message: every turn holds exactly one human message (264/264
+  // measured), so "turn(s)" is the accurate noun. The intent of this test is unchanged — a silent
+  // truncation must never read as "this is everything".
+  assert.match(out, /more turn\(s\) omitted by the size cap/)
   assert.match(out, /remain in the session log/)
 })
 
