@@ -13,8 +13,8 @@ const { readSection, validateLimit } = mod;
 
 test('readSection returns defaults when section absent', () => {
   const cfg = readSection('agent-default-model:\n  provider: x\n');
-  assert.equal(cfg.minContextLimit, '60%');
-  assert.equal(cfg.maxContextLimit, '70%');
+  assert.equal(cfg.minContextLimit, '65%');
+  assert.equal(cfg.maxContextLimit, '85%');
   assert.equal(cfg.preserveRecent, 2);
   assert.equal(cfg.minTokens, 200);
   assert.equal(cfg.nudge, true);
