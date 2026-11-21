@@ -15,15 +15,25 @@ import assert from 'node:assert/strict';
 const mod = await import('../lib/subagent-tool-scope.js');
 const { SUBAGENT_DENY, subagentDenyList, shouldRestrict, restrictSubagentTools } = mod;
 
-/** A ctx whose tools.restrict records what it was asked to deny. */
-function fakeCtx({ failOnUnknown = false } = {}) {
+/**
+ * A ctx whose tools.restrict behaves like the real one.
+ *
+ * The real implementation (dsh-tools/lib/index.js:453-466) throws on the FIRST unknown name and
+ * names every unknown tool in the message, so the fake must do the same or the narrowing path
+ * cannot be tested.
+ */
+function fakeCtx({ unknownNames = [], failWith = null } = {}) {
   const calls = [];
   return {
     calls,
     get: (name) => (name === 'tools' ? {
       restrict: (filter) => {
         calls.push(filter);
-        if (failOnUnknown) throw new Error('unknown tool name');
+        if (failWith != null) throw new Error(failWith);
+        const named = (filter.deny ?? []).filter((n) => unknownNames.includes(n));
+        if (named.length > 0) {
+          throw new Error(`tools.restrict() names unknown global tool${named.length > 1 ? 's' : ''} ${named.map((n) => `"${n}"`).join(', ')}; known global tools: ...`);
+        }
         return () => { calls.push({ disposed: true }); };
       },
     } : null),
@@ -61,31 +71,47 @@ test('a subagent is restricted, a root session is not', () => {
 
 test('restrictSubagentTools applies the deny list and returns a disposer', () => {
   const ctx = fakeCtx();
-  const disposer = restrictSubagentTools(ctx, agentWith({ origin: 'subagent' }));
+  const applied = restrictSubagentTools(ctx, agentWith({ origin: 'subagent' }));
   assert.equal(ctx.calls.length, 1, 'exactly one restrict call');
   assert.deepEqual(ctx.calls[0].deny, subagentDenyList());
   assert.equal(ctx.calls[0].allow, undefined, 'deny only — allow would freeze the toolset');
-  assert.equal(typeof disposer, 'function', 'the restriction must be reversible');
-  disposer();
+  assert.equal(typeof applied.disposer, 'function', 'the restriction must be reversible');
+  assert.equal(applied.denied, subagentDenyList().length);
+  assert.deepEqual(applied.skipped, []);
+  applied.disposer();
   assert.deepEqual(ctx.calls[1], { disposed: true });
 });
 
 test('a root session gets NO restriction', () => {
   const ctx = fakeCtx();
-  const disposer = restrictSubagentTools(ctx, agentWith({ delegationDepth: 0 }));
-  assert.equal(disposer, null);
+  const applied = restrictSubagentTools(ctx, agentWith({ delegationDepth: 0 }));
+  assert.equal(applied.disposer, null);
   assert.equal(ctx.calls.length, 0, 'a root session must keep every tool');
 });
 
-test('an unknown tool name fails loudly instead of silently disabling the restriction', () => {
-  // By contract, `restrict` fails the whole call on an unknown name. Swallowing that would leave
-  // the subagent with every tool and no signal that the fix did nothing.
-  const ctx = fakeCtx({ failOnUnknown: true });
-  const disposer = restrictSubagentTools(ctx, agentWith({ origin: 'subagent' }));
-  assert.equal(disposer, null, 'the caller must be able to tell it did not apply');
+test('a not-yet-registered tool is SKIPPED, not fatal', () => {
+  // `restrict()` validates every name against the registrations that exist AT THAT MOMENT
+  // (dsh-tools/lib/index.js:463-465) and throws on the first unknown one. A tool registered a
+  // moment later — a lazily loaded bundle — would therefore fail the WHOLE call and leave the
+  // subagent with every tool. The helper narrows instead.
+  const ctx = fakeCtx({ unknownNames: ['rlab_related', 'ssh_tunnel'] });
+  const applied = restrictSubagentTools(ctx, agentWith({ origin: 'subagent' }));
+  assert.equal(typeof applied.disposer, 'function', 'the restriction must still apply');
+  assert.deepEqual(applied.skipped, ['rlab_related', 'ssh_tunnel']);
+  assert.equal(applied.denied, subagentDenyList().length - 2);
+  assert.ok(!ctx.calls.at(-1).deny.includes('rlab_related'), 'the unknown name must be dropped');
+  assert.ok(ctx.calls.at(-1).deny.includes('rlab_ocr'), 'the known names must survive');
+});
+
+test('a failure that is NOT about unknown names reports nothing applied', () => {
+  // Swallowing an unrelated error would hide a real defect behind "it did not apply".
+  const ctx = fakeCtx({ failWith: 'tools.restrict() requires a scoped context (agent.ctx)' });
+  const applied = restrictSubagentTools(ctx, agentWith({ origin: 'subagent' }));
+  assert.equal(applied.disposer, null);
+  assert.deepEqual(applied.skipped, []);
 });
 
 test('a ctx without a tool registry is a no-op, not a crash', () => {
-  assert.equal(restrictSubagentTools({ get: () => null }, agentWith({ origin: 'subagent' })), null);
-  assert.equal(restrictSubagentTools(null, agentWith({ origin: 'subagent' })), null);
+  assert.equal(restrictSubagentTools({ get: () => null }, agentWith({ origin: 'subagent' })).disposer, null);
+  assert.equal(restrictSubagentTools(null, agentWith({ origin: 'subagent' })).disposer, null);
 });
