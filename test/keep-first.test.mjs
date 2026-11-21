@@ -82,3 +82,33 @@ test('firstHumanSeq: 空陣列或非陣列回 null', () => {
   assert.equal(firstHumanSeq(null), null)
   assert.equal(firstHumanSeq(undefined), null)
 })
+
+// 真實 surface 是【物件陣列】，不是 seq 陣列。第一版用 nodes.indexOf(seq)，
+// 比對的是物件參考，所以永遠找不到——實測 58/58 個 session 的 withKeep.start
+// 與 without.start 完全相同，keepFirst 靜默失效。
+test('keepFirst: 節點是物件時也要生效（indexOf 比對物件參考會失效）', () => {
+  const nodes = [
+    { seq: 1, type: 'system/message' },
+    { seq: 2, type: 'user/message', source: { kind: 'runtime-context' } },
+    { seq: 3, type: 'user/message', source: { kind: 'user' } },
+    { seq: 4, type: 'assistant/message' },
+    { seq: 5, type: 'user/message', source: { kind: 'runtime-context' } },
+    { seq: 6, type: 'assistant/message' },
+    { seq: 7, type: 'user/message', source: { kind: 'runtime-context' } },
+    { seq: 8, type: 'assistant/message' },
+  ]
+  const fh = firstHumanSeq(nodes)
+  assert.equal(fh, 3)
+  const without = hostFoldRange(nodes, 2)
+  const withKeep = hostFoldRange(nodes, 2, { keepFirst: fh })
+  assert.equal(without.start.seq, 2, '沒有 keepFirst 時從 nodes[1] 開始')
+  assert.equal(withKeep.start.seq, 4, '有 keepFirst 時必須跳過 seq 3')
+  assert.notEqual(withKeep.start.seq, without.start.seq, 'keepFirst 必須真的改變起點')
+})
+
+test('keepFirst: 物件陣列且第一則真人訊息在很後面', () => {
+  const nodes = Array.from({ length: 12 }, (_, i) => ({ seq: i + 1, type: 'assistant/message' }))
+  nodes[7] = { seq: 8, type: 'user/message', source: { kind: 'user' } }
+  const r = hostFoldRange(nodes, 2, { keepFirst: 8 })
+  assert.equal(r.start.seq, 9)
+})
