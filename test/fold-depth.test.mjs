@@ -54,13 +54,23 @@ test('a higher target folds LESS, a lower target folds MORE', () => {
     `0.60 should fold less than 0.20: shallow starts at ${shallow}, deep at ${deep}`);
 });
 
-test('the host fold path asks for a deep fold', () => {
+test('the host fold path asks for a deep fold AND applies the target to the end', () => {
   // The decision, not the arithmetic: read the source and require `deep: true` on the
   // host-trigger call. This is the assertion that would have caught the original bug.
+  //
+  // ⚠ `deep: true` alone is NOT enough, and that was measured: `_p0/probe-deepfold-noop.mjs`
+  // replayed all 9 folds of session 14cc3134 and `deepFoldStart` could reach back on 0 of 9 —
+  // the range already starts at the first foldable node. So the host path must ALSO narrow the
+  // END via `foldEndForTarget`, or the fold stays maximal and lands at 1.1% instead of 35%.
   const text = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8');
-  const hostCall = /runCompaction\(agent, \{ \.\.\.range, deep: (\w+), summary: null, topic: 'host-trigger' \}\)/.exec(text);
+  const hostCall = /runCompaction\(agent, \{ start: range\.start, end: (\w+), deep: (\w+), summary: null, topic: 'host-trigger' \}\)/.exec(text);
   assert.ok(hostCall, 'the host-trigger runCompaction call must be findable');
-  assert.equal(hostCall[1], 'true', 'the host fold must pass deep: true, or compressTargetRatio never applies');
+  assert.equal(hostCall[2], 'true', 'the host fold must pass deep: true, or compressTargetRatio never applies');
+  assert.equal(hostCall[1], 'foldEnd', 'the host fold must use the target-derived end, not the maximal range end');
+  assert.ok(
+    /foldEndForTarget\(meter, session, config, range\.start, range\.end, w, \{ eventBySeq: live \}\)/.test(text),
+    'the host fold must compute its end from compressTargetRatio',
+  );
   const modCall = /runCompaction\(agent, \{ \.\.\.range, deep: (\w+), summary: null, topic: 'moderation-reset' \}\)/.exec(text);
   assert.ok(modCall, 'the moderation-reset runCompaction call must be findable');
   assert.equal(modCall[1], 'true', 'a moderation reset is a fold like any other');
