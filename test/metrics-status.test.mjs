@@ -159,9 +159,20 @@ test('the host folds by itself at the fuse — no model call, no user, no asking
   assert.equal(typeof preStep, 'function', 'the automatic fold must hang off agent/pre-step');
   let nextCalled = false;
   await preStep({ agent }, () => { nextCalled = true; });
-  // [2, 8]: index 0 is the system-prompt node and is NEVER folded (a host fold that rewrote it was a
+  // [2, 7]: index 0 is the system-prompt node and is NEVER folded (a host fold that rewrote it was a
   // real bug once); the last two nodes are the preserved tail.
-  assert.deepEqual(foldedCalls, [[2, 8]], "everything foldable was folded, unprompted");
+  //
+  // ⚠ This used to expect [2, 8] — the MAXIMAL fold, ending at the last foldable node. That was the
+  // behaviour while `foldEndForTarget` could not read `end: 'auto'`: it answered "cannot compute",
+  // the caller kept the maximal range, and `compressTargetRatio` never applied. Now the target does
+  // apply, and the arithmetic is:
+  //   surface 10 × 95,000 = 950,000   window 1,000,000   target 0.35 → 350,000
+  //   need = 950,000 − 350,000 = 600,000
+  //   folding seqs 2..7 removes 6 × 95,000 = 570,000 (leaves 380,000 = 38.0%)
+  //   folding seqs 2..8 removes 7 × 95,000 = 665,000 (leaves 285,000 = 28.5%)
+  // 38.0% is 3.0 points from the target, 28.5% is 6.5 points away — and the function deliberately
+  // errs on the "fold less" side, because the operator's complaint was over-compression.
+  assert.deepEqual(foldedCalls, [[2, 7]], "the fold lands at the target, not at the maximal range");
   assert.ok(nextCalled, "and the step then proceeds — the fold does not stop the run");
   assert.ok(logs.some((l) => /acp host-trigger: folded 950000 -> 300000/.test(l)), "the fold is logged: " + logs.join(" | "));
   const rows = readMetrics().rows;
