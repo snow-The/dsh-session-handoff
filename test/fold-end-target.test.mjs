@@ -157,3 +157,61 @@ test('foldEndForTarget: 節點是物件時也要找到（跨版本）', () => {
   const r = foldEndForTarget(meter, session, { compressTargetRatio: 0.35 }, 2, 20, 200_000)
   assert.equal(r.end, 14, `節點物件也要算對，實際 ${r.end}`)
 })
+
+/**
+ * 分母的來源：官方 `surfaceTokens` 優先，自己加總只是相容路徑。
+ *
+ * 官方 `token-meter.md:22-23` 說 `surfaceTokens` "equals the sum of the node prices"，
+ * 而實作（`dsh-token-meter/lib/index.js:762-769`）是在回傳節點價格的同一個 `map` 裡累加的，
+ * 所以兩者相等是**建構出來的**，不是巧合。
+ *
+ * 既然如此，為什麼還要讀官方欄位？因為自己加總的那段迴圈是第二份實作，它與節點價格的
+ * 一致性沒有任何機制保證。讀官方欄位，分母就永遠等於它被拿去比較的那組價格。
+ *
+ * 下面兩個測試是一對，必須一起看：
+ *   有 surfaceTokens  → 用它（即使它與加總不同）
+ *   沒有 surfaceTokens → 退回加總
+ * 只寫其中一個，就分不出「讀了欄位」與「碰巧算出同一個答案」。
+ */
+test('foldEndForTarget: 有 surfaceTokens 時用它，不是自己加總', () => {
+  // 節點加總 = 20 × 10k = 200k，但 meter 自報 surfaceTokens = 400k。
+  // 視窗 200k、目標 0.35 → target 70k。
+  //   用 surfaceTokens(400k)：need 330k → 20 個節點全摺 → end = 20
+  //   用加總(200k)        ：need 130k → 摺 13 個      → end = 14
+  // 兩個答案不同，所以這個斷言分得出程式讀的是哪一個。
+  const seqs = Array.from({ length: 20 }, (_, i) => i + 1)
+  const meter = {
+    measure: () => ({
+      nodes: seqs.map((seq) => ({ seq, tokens: 10_000 })),
+      surfaceTokens: 400_000,
+    }),
+  }
+  const session = fakeSession(seqs)
+
+  const r = foldEndForTarget(meter, session, { compressTargetRatio: 0.35 }, 2, 20, 200_000)
+  assert.equal(r.end, 20, `應該用 meter 自報的 surfaceTokens（400k → 摺到 end），實際 ${r.end}`)
+})
+
+test('foldEndForTarget: 沒有 surfaceTokens 時退回自己加總（相容路徑）', () => {
+  // 同一個表面，meter 不報 surfaceTokens → 必須退回加總，得到 14。
+  // 這條路徑不是死碼：舊版 meter 沒有這個欄位。
+  const seqs = Array.from({ length: 20 }, (_, i) => i + 1)
+  const meter = { measure: () => ({ nodes: seqs.map((seq) => ({ seq, tokens: 10_000 })) }) }
+  const session = fakeSession(seqs)
+
+  const r = foldEndForTarget(meter, session, { compressTargetRatio: 0.35 }, 2, 20, 200_000)
+  assert.equal(r.end, 14, `沒有 surfaceTokens 時要退回加總（200k → 摺 13 個），實際 ${r.end}`)
+})
+
+test('foldEndForTarget: surfaceTokens 是 0 或負數時退回加總（不是當成「表面是空的」）', () => {
+  // 0 與「算不出來」必須分得開：0 若被當成有效分母，target 就是 0，
+  // need = surfaceTotal - 0，於是摺到 end —— 過度壓縮，正是這個函式要防的事。
+  const seqs = Array.from({ length: 20 }, (_, i) => i + 1)
+  for (const bad of [0, -1, NaN]) {
+    const meter = {
+      measure: () => ({ nodes: seqs.map((seq) => ({ seq, tokens: 10_000 })), surfaceTokens: bad }),
+    }
+    const r = foldEndForTarget(meter, fakeSession(seqs), { compressTargetRatio: 0.35 }, 2, 20, 200_000)
+    assert.equal(r.end, 14, `surfaceTokens=${bad} 時應退回加總，實際 ${r.end}`)
+  }
+})
