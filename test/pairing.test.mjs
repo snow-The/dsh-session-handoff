@@ -38,3 +38,44 @@ test('a mixed log (V3 and V4 rows) still balances', () => {
   const withV3Close = new Map([[1, text('ask')], [2, call('x')], [3, v3Result('x')]]);
   assert.deepEqual([...balancedCutsAfter(nodes, withV3Close)].sort((a, b) => a - b), [0, 2], 'and a V3 close gives the same cuts');
 });
+
+/**
+ * A tool-call with NO id still opens a call.
+ *
+ * The core counts calls rather than matching ids (`eventDelta` in
+ * `dsh-compaction/lib/index.js:21-27` returns the NUMBER of tool-call blocks), so an anonymous
+ * open leaves the core's counter above zero. Skipping it here made this function report a cut as
+ * balanced where the core reports it as unbalanced — the dangerous direction, because the fold
+ * then asks for an end the core refuses and the retry has nothing to snap down to.
+ *
+ * Measured 2026-11-22 (`_p0/probe-pairing-agreement.mjs`): 0 occurrences in 9,978 real surface
+ * nodes. This is preventive, and the test says so rather than implying an observed failure.
+ */
+test('an id-less tool-call still opens a call (the core counts, it does not match ids)', () => {
+  const anonymousCall = { data: { message: { role: 'assistant', content: [{ type: 'tool-call', name: 'run_code' }] } } };
+  const { opens, closes } = pairingEffect(anonymousCall);
+  assert.equal(opens.length, 1, 'an id-less call must still count as an open');
+  assert.equal(closes.length, 0);
+
+  // And it must keep the cut unbalanced: nothing can close an anonymous call, exactly as the
+  // core's counter can never come back down.
+  const nodes = [1, 2, 3];
+  const bySeq = new Map([[1, text('ask')], [2, anonymousCall], [3, text('done')]]);
+  assert.deepEqual([...balancedCutsAfter(nodes, bySeq)].sort((a, b) => a - b), [0], 'the cut after the anonymous call stays unbalanced');
+});
+
+test('two anonymous calls in one message open two calls, not one', () => {
+  // The core adds the COUNT of tool-call blocks. A single synthetic id would under-count, so the
+  // synthetic ids must be distinct per block.
+  const twoAnon = {
+    data: {
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool-call', name: 'a' }, { type: 'tool-call', name: 'b' }],
+      },
+    },
+  };
+  const { opens } = pairingEffect(twoAnon);
+  assert.equal(opens.length, 2);
+  assert.notEqual(opens[0], opens[1], 'distinct synthetic ids, so the count matches the core');
+});
