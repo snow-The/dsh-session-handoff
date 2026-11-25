@@ -138,7 +138,18 @@ test('the quiet line reports fullness against the WINDOW, and names the soft lim
   assert.match(line, /^ACP: 730000\/1000000 tokens \(/, 'the live banner shape: ' + line);
   assert.match(line, /73% of the window/, 'window percentage first: ' + line);
   // The budget number hangs off the HARD ceiling; the soft number is NAMED as a trigger.
-  assert.match(line, /hard ceiling 900000 — 170k of room/, 'ceiling room: ' + line);
+  //
+  // QUANTISED (2026-11-25). This used to assert "170k of room". A number in thousands of tokens
+  // changes every 1,000 tokens, so the line differed on almost every turn -- and
+  // `runtime-context` only injects when its sections differ
+  // (dsh-agent-loop/lib/index.js:341). A number that changes every turn defeats that mechanism.
+  //
+  // Criterion: a mechanism that only injects when the value changed, that still injects every turn,
+  // means the INPUT changed.
+  //
+  // So the room is now reported in tenths of the ceiling, rounded DOWN so it never overstates what
+  // is left. 730000 of 900000 leaves 170000 = 18.9%, which floors to 10%.
+  assert.match(line, /hard ceiling 900000 — 10% of room/, 'ceiling room, quantised to a tenth: ' + line);
   assert.match(line, /soft trigger 780000 \(fold when you pass it, it is not a cap\)/, 'soft as a trigger: ' + line);
   // A distance number next to the trigger was read as a budget in a real session ("~7k before the
   // soft trigger - I'm at the limit" -> the agent wrapped up and promised a fold that never came).
